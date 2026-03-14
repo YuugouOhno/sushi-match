@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>寿司相性マッチング</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.7/Sortable.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -307,15 +308,17 @@
       margin-bottom: 5px;
       background: var(--surface);
       border: 1px solid var(--border);
-      cursor: grab;
       user-select: none;
+      touch-action: manipulation;
       transition: opacity 0.12s, box-shadow 0.12s, transform 0.08s;
       will-change: transform;
     }
-    .rank-item:active { cursor: grabbing; }
-    .rank-item.dragging {
+    .rank-item.sortable-chosen {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.16);
+      border-color: var(--vermilion);
+    }
+    .rank-item.sortable-ghost {
       opacity: 0.28;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.18);
       border-color: var(--vermilion);
       transform: scale(0.98);
     }
@@ -333,7 +336,17 @@
 
     .rank-icon { width: 36px; height: 36px; object-fit: cover; border-radius: 50%; flex-shrink: 0; border: 1px solid var(--border); background: var(--bg2); }
     .rank-label { flex: 1; font-size: 0.9rem; font-weight: 500; }
-    .rank-handle { color: var(--border2); font-size: 0.95rem; flex-shrink: 0; }
+    .rank-handle {
+      color: var(--border2);
+      font-size: 1.3rem;
+      flex-shrink: 0;
+      cursor: grab;
+      touch-action: none;
+      padding: 6px 8px;
+      margin: -6px -8px;
+      line-height: 1;
+    }
+    .rank-handle:active { cursor: grabbing; }
 
     /* Fixed submit bar */
     .submit-bar {
@@ -741,7 +754,7 @@
     <div class="home-komon">🍣</div>
     <h1 class="home-title">寿司相性マッチング</h1>
     <div class="home-rule"></div>
-    <p class="home-desc">好きな寿司ネタを「食べたい順」に並べると<br>仲間との相性がわかります</p>
+    <p class="home-desc">このメニューが出てきたら、どの順番で食べる？<br>食べる順番で仲間との相性がわかります</p>
 
     <div class="mode-sel">
       <div class="home-section-label">ネタ数</div>
@@ -798,7 +811,7 @@
         <button class="btn-share" style="flex:1" onclick="copyGroupInvite()">🔗 URLをコピー</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-        <button class="btn-primary" onclick="showInput()">順位を登録する</button>
+        <button class="btn-primary" onclick="showInput()">順番を登録する</button>
         <button class="btn-secondary" onclick="uiViewGroupResults(this)">グループの結果を見る</button>
         <button class="btn-secondary" style="font-size:0.82rem;color:var(--ink3)"
                 onclick="uiLeaveGroup()">グループを抜ける</button>
@@ -822,8 +835,8 @@
   <div class="input-body">
     <div class="field-label">お名前</div>
     <input class="name-field" id="nameInput" type="text" placeholder="名前を入力してください" maxlength="20" autocomplete="off">
-    <div class="field-label">好きな順に並べてください</div>
-    <div class="rank-note">長押しして上下にドラッグ（スマホ）またはドラッグ＆ドロップ（PC）で並べ替え。1位が一番食べたい。</div>
+    <div class="field-label">食べる順番に並べてください</div>
+    <div class="rank-note">右端の ⠿ をつかんで上下に動かすと並べ替えられます。スマホは少し長押ししてから動かしてください。</div>
     <ul class="rank-list" id="rankList"></ul>
   </div>
   <div class="submit-bar">
@@ -907,7 +920,7 @@
 
   const usersByMode = {5:[], 10:[], 20:[]};
   function getUsers() { return usersByMode[mode]; }
-  let curOrder = [...getItems()], dragItem = null;
+  let curOrder = [...getItems()];
 
   // ── GROUP MODE ──
   // GASウェブアプリのURL（clasp deploy 後に設定）
@@ -994,52 +1007,40 @@
   }
 
   // ── INPUT ──
+  let _sortable = null;
+
   function renderList() {
+    if (_sortable) { _sortable.destroy(); _sortable = null; }
     document.getElementById('rankList').innerHTML = curOrder.map((item, i) => `
-      <li class="rank-item" draggable="true" data-item="${item}"
-          ondragstart="ds(event)" ondragover="dov(event)"
-          ondragenter="den(event)" ondragleave="dlv(event)"
-          ondrop="drp(event)" ondragend="dend(event)">
+      <li class="rank-item" data-item="${item}">
         <span class="rank-n ${i<3?'top':''}">${i+1}</span>
         <img class="rank-icon" src="${IMG_PATH[item]}" alt="${item}">
         <span class="rank-label">${item}</span>
         <span class="rank-handle">⠿</span>
       </li>`).join('');
-    // タッチドラッグ対応
-    document.getElementById('rankList').querySelectorAll('.rank-item').forEach(addTouchDrag);
-  }
-
-  // ── TOUCH DRAG & DROP ──
-  let touchDragEl = null;
-
-  function addTouchDrag(li) {
-    li.addEventListener('touchstart', function() {
-      touchDragEl = li;
-      dragItemEl = li;
-      requestAnimationFrame(() => li.classList.add('dragging'));
-    }, {passive: true});
-
-    li.addEventListener('touchmove', function(e) {
-      e.preventDefault();
-      if (!touchDragEl) return;
-      const touch = e.touches[0];
-      const list = document.getElementById('rankList');
-      const after = dragAfterEl(list, touch.clientY);
-      if (after == null) list.appendChild(touchDragEl);
-      else if (after !== touchDragEl) list.insertBefore(touchDragEl, after);
-      updateNums(list);
-    }, {passive: false});
-
-    li.addEventListener('touchend', function() {
-      if (touchDragEl) {
-        touchDragEl.classList.remove('dragging');
-        const list = document.getElementById('rankList');
+    const list = document.getElementById('rankList');
+    _sortable = new Sortable(list, {
+      animation: 150,
+      handle: '.rank-handle',
+      forceFallback: true,
+      fallbackTolerance: 5,
+      delay: 120,
+      delayOnTouchOnly: true,
+      touchStartThreshold: 4,
+      scroll: true,
+      scrollSensitivity: 60,
+      scrollSpeed: 14,
+      bubbleScroll: true,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onChange() { updateNums(list); },
+      onEnd() {
         curOrder = [...list.querySelectorAll('.rank-item')].map(el => el.dataset.item);
-        touchDragEl = null;
-        dragItemEl = null;
+        updateNums(list);
       }
     });
   }
+
 
   async function register() {
     const name = document.getElementById('nameInput').value.trim();
@@ -1075,58 +1076,6 @@
     mode = m;
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === String(m)));
     showHome();
-  }
-
-  // ── DRAG & DROP (live DOM reorder — no re-render on drop) ──
-  let dragItemEl = null;
-
-  function ds(e) {
-    dragItemEl = e.currentTarget;
-    dragItem = dragItemEl.dataset.item;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', dragItem);
-    // Defer .dragging so browser captures ghost image at full opacity first
-    requestAnimationFrame(() => {
-      if (dragItemEl) dragItemEl.classList.add('dragging');
-    });
-  }
-
-  function dov(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (!dragItemEl) return;
-    const list = document.getElementById('rankList');
-    const after = dragAfterEl(list, e.clientY);
-    if (after == null) {
-      list.appendChild(dragItemEl);
-    } else if (after !== dragItemEl) {
-      list.insertBefore(dragItemEl, after);
-    }
-    updateNums(list);
-  }
-
-  function den(e) { e.preventDefault(); }
-  function dlv(e) {}
-
-  function drp(e) {
-    e.preventDefault();
-    // Order is already correct in DOM — just sync to data
-    const list = document.getElementById('rankList');
-    curOrder = [...list.querySelectorAll('.rank-item')].map(el => el.dataset.item);
-  }
-
-  function dend(e) {
-    if (dragItemEl) { dragItemEl.classList.remove('dragging'); dragItemEl = null; }
-    dragItem = null;
-  }
-
-  function dragAfterEl(container, y) {
-    const els = [...container.querySelectorAll('.rank-item:not(.dragging)')];
-    return els.reduce((closest, el) => {
-      const { top, height } = el.getBoundingClientRect();
-      const offset = y - top - height / 2;
-      return (offset < 0 && offset > closest.offset) ? { offset, element: el } : closest;
-    }, { offset: -Infinity }).element;
   }
 
   function updateNums(list) {
@@ -1428,7 +1377,7 @@
         `  ${p.userA.name} × ${p.userB.name}: 総合${p.total} | 順位差${p.bd.rd} | 上位3件${p.bd.t3} | 順序${p.bd.po}`
       ),
       '',
-      '■ 参加者の選択順位',
+      '■ 参加者の食べる順番',
       ...getUsers().map(u => `${u.name}: ${u.order.join(' > ')}`),
       '',
       `共有URL: ${getShareUrl()}`,
