@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>寿司相性マッチング</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #f2ebe0;
+      --bg2:         #e8e0d4;
+      --surface:     #faf7f2;
+      --border:      #cfc5b8;
+      --border2:     #b0a498;
+      --ink:         #18100a;
+      --ink2:        #5a4a40;
+      --ink3:        #9a8878;
+      --vermilion:   #be1e12;
+      --verm-dark:   #8c160d;
+      --verm-pale:   #f8e8e6;
+      --pine:        #2a5c42;
+      --pine-pale:   #e6f2ec;
+      --navy:        #1e3d78;
+      --fs:          'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+      --fn:          'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+    }
+
+    body {
+      font-family: var(--fn);
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      line-height: 1.65;
+    }
+
+    /* ── SCREEN SYSTEM ── */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: block; }
+
+    /* ══════════════════════════════════════════
+       HOME SCREEN
+    ══════════════════════════════════════════ */
+    .home-outer {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 64px 28px 80px;
+    }
+
+    .home-komon {
+      width: 56px;
+      height: 56px;
+      background: var(--vermilion);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin: 0 auto 20px;
+    }
+
+    .home-title {
+      font-family: var(--fs);
+      font-size: 1.85rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-align: center;
+      color: var(--ink);
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
+
+    .home-rule {
+      width: 40px;
+      height: 2px;
+      background: var(--vermilion);
+      margin: 16px auto 18px;
+    }
+
+    .home-desc {
+      font-size: 0.86rem;
+      color: var(--ink3);
+      text-align: center;
+      line-height: 1.8;
+      margin-bottom: 48px;
+    }
+
+    /* Participants */
+    .home-section-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--ink3);
+      margin-bottom: 10px;
+    }
+
+    .home-participants {
+      margin-bottom: 32px;
+    }
+
+    .participant-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .participant-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 0.84rem;
+      font-weight: 500;
+    }
+
+    .p-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--pine);
+      flex-shrink: 0;
+    }
+
+    .no-p {
+      font-size: 0.83rem;
+      color: var(--ink3);
+      padding: 14px;
+      border: 1px dashed var(--border);
+      text-align: center;
+    }
+
+    /* Buttons */
+    .home-actions { display: flex; flex-direction: column; gap: 8px; }
+
+    .btn-primary {
+      width: 100%;
+      padding: 15px;
+      background: var(--vermilion);
+      color: #fff;
+      border: none;
+      font-family: var(--fn);
+      font-size: 0.96rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: var(--verm-dark); }
+
+    .btn-secondary {
+      width: 100%;
+      padding: 13px;
+      background: transparent;
+      color: var(--ink2);
+      border: 1.5px solid var(--border2);
+      font-family: var(--fn);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-secondary:hover { border-color: var(--vermilion); color: var(--vermilion); }
+    .btn-secondary:disabled { opacity: 0.38; cursor: default; }
+    .btn-secondary:disabled:hover { border-color: var(--border2); color: var(--ink2); }
+
+    .home-notice {
+      display: none;
+      margin-bottom: 20px;
+      padding: 10px 14px;
+      background: var(--pine-pale);
+      border-left: 3px solid var(--pine);
+      font-size: 0.84rem;
+      color: var(--pine);
+      font-weight: 500;
+    }
+    .home-notice.show { display: block; }
+
+    .home-meta {
+      margin-top: 40px;
+      display: flex;
+      gap: 18px;
+      justify-content: center;
+    }
+    .home-meta button {
+      background: none;
+      border: none;
+      font-family: var(--fn);
+      font-size: 0.76rem;
+      color: var(--ink3);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      padding: 0;
+    }
+    .home-meta button:hover { color: var(--ink2); }
+
+    /* ══════════════════════════════════════════
+       INPUT SCREEN
+    ══════════════════════════════════════════ */
+    .topbar {
+      display: flex;
+      align-items: center;
+      padding: 14px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .btn-back {
+      background: none;
+      border: none;
+      font-family: var(--fn);
+      font-size: 0.84rem;
+      color: var(--ink2);
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .btn-back:hover { color: var(--ink); }
+
+    .topbar-title {
+      flex: 1;
+      text-align: center;
+      font-family: var(--fs);
+      font-size: 0.94rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .topbar-spacer { width: 48px; }
+
+    .input-body {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 28px 24px 120px;
+    }
+
+    .field-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--ink3);
+      margin-bottom: 7px;
+    }
+
+    .name-field {
+      display: block;
+      width: 100%;
+      padding: 11px 13px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      font-family: var(--fn);
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--ink);
+      margin-bottom: 30px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .name-field:focus { border-color: var(--vermilion); }
+    .name-field::placeholder { color: var(--ink3); font-weight: 400; }
+
+    .rank-note {
+      font-size: 0.78rem;
+      color: var(--ink3);
+      padding: 9px 12px;
+      background: var(--bg2);
+      margin-bottom: 14px;
+    }
+
+    /* Ranking list */
+    .rank-list { list-style: none; }
+
+    .rank-item {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 10px 13px;
+      margin-bottom: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      cursor: grab;
+      user-select: none;
+      transition: opacity 0.12s, box-shadow 0.12s, transform 0.08s;
+      will-change: transform;
+    }
+    .rank-item:active { cursor: grabbing; }
+    .rank-item.dragging {
+      opacity: 0.28;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+      border-color: var(--vermilion);
+      transform: scale(0.98);
+    }
+
+    .rank-n {
+      font-family: var(--fs);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--ink3);
+      min-width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .rank-n.top { color: var(--vermilion); }
+
+    .rank-icon { width: 36px; height: 36px; object-fit: cover; border-radius: 50%; flex-shrink: 0; border: 1px solid var(--border); background: var(--bg2); }
+    .rank-label { flex: 1; font-size: 0.9rem; font-weight: 500; }
+    .rank-handle { color: var(--border2); font-size: 0.95rem; flex-shrink: 0; }
+
+    /* Fixed submit bar */
+    .submit-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      padding: 14px 24px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+    }
+
+    .submit-bar .btn-primary {
+      max-width: 480px;
+      margin: 0 auto;
+      display: block;
+    }
+
+    /* ══════════════════════════════════════════
+       RESULTS SCREEN
+    ══════════════════════════════════════════ */
+    .results-body {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 28px 24px 56px;
+    }
+
+    .results-heading {
+      font-family: var(--fs);
+      font-size: 1.4rem;
+      font-weight: 900;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .results-sub {
+      font-size: 0.8rem;
+      color: var(--ink3);
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    /* Tabs */
+    .tab-nav {
+      display: flex;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 22px;
+    }
+    .tab-btn {
+      padding: 9px 20px;
+      border: none;
+      background: none;
+      font-family: var(--fn);
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: var(--ink3);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.14s, border-color 0.14s;
+    }
+    .tab-btn.active { color: var(--vermilion); border-bottom-color: var(--vermilion); }
+    .tab-btn:hover:not(.active) { color: var(--ink2); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* Results grid */
+    .rg { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px; }
+    @media (max-width: 620px) { .rg { grid-template-columns: 1fr; } }
+
+    .rc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 18px;
+    }
+    .rc h3 {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--ink2);
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pair-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--bg2);
+      gap: 8px;
+    }
+    .pair-row:last-child { border-bottom: none; }
+    .pair-l { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
+    .p-medal { font-size: 1rem; flex-shrink: 0; }
+    .p-names { font-size: 0.82rem; color: var(--ink2); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .p-tag { font-size: 0.66rem; padding: 1px 6px; font-weight: 700; flex-shrink: 0; }
+    .tag-hi  { background: var(--verm-pale); color: var(--vermilion); }
+    .tag-mid { background: #fef2dc; color: #a06800; }
+    .tag-lo  { background: #edf1f8; color: #4a68a0; }
+
+    .p-score { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .sbar-bg { width: 56px; height: 6px; background: var(--bg2); overflow: hidden; }
+    .sbar-fill { height: 100%; transition: width 0.4s ease; }
+    .sval {
+      font-family: var(--fs);
+      font-size: 1rem;
+      font-weight: 900;
+      min-width: 40px;
+      text-align: right;
+    }
+
+    .bk-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .bk-table th {
+      background: var(--bg);
+      padding: 6px 8px;
+      text-align: center;
+      color: var(--ink3);
+      font-size: 0.7rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+    }
+    .bk-table th:first-child { text-align: left; }
+    .bk-table td { padding: 6px 8px; border-bottom: 1px solid var(--bg2); text-align: center; }
+    .bk-table td:first-child { text-align: left; color: var(--ink2); font-weight: 600; font-size: 0.76rem; }
+    .bk-table tr:last-child td { border-bottom: none; }
+    .wh { font-size: 0.66rem; color: var(--ink3); font-weight: 400; display: block; }
+
+    .chip { display: inline-block; padding: 1px 6px; font-size: 0.72rem; font-weight: 700; }
+    .chip-hi  { background: var(--verm-pale); color: var(--vermilion); }
+    .chip-mid { background: #fef2dc; color: #a06800; }
+    .chip-lo  { background: #edf1f8; color: #4a68a0; }
+    .chip-sub { background: var(--bg2); color: var(--ink2); }
+
+    /* Compare tab */
+    .cmp-sel {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+    .sel-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .sel-wrap label { font-size: 0.65rem; font-weight: 700; color: var(--ink3); letter-spacing: 0.08em; }
+    .sel {
+      padding: 8px 12px;
+      border: 1.5px solid var(--border);
+      font-family: var(--fn);
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--ink);
+      background: var(--surface);
+      cursor: pointer;
+      min-width: 110px;
+      outline: none;
+    }
+    .sel:focus { border-color: var(--vermilion); }
+    .vs { font-weight: 900; font-size: 0.84rem; color: var(--vermilion); padding: 7px 9px; border: 1px solid var(--verm-pale); background: var(--verm-pale); margin-bottom: 1px; }
+
+    .cmp-score-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 22px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 26px;
+    }
+    @media (max-width: 500px) { .cmp-score-card { flex-direction: column; gap: 16px; } }
+
+    .score-big { text-align: center; flex-shrink: 0; }
+    .score-num {
+      font-family: var(--fs);
+      font-size: 4.2rem;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    .score-unit { font-size: 1rem; font-weight: 700; vertical-align: super; font-family: var(--fn); }
+    .score-lbl { font-size: 0.88rem; font-weight: 700; margin-top: 3px; }
+    .score-pair { font-size: 0.73rem; color: var(--ink3); margin-top: 2px; }
+
+    .sub-scores { flex: 1; display: flex; flex-direction: column; gap: 9px; }
+    .sub-row { display: grid; grid-template-columns: 92px 1fr 32px; align-items: center; gap: 9px; }
+    .sub-name { font-size: 0.73rem; color: var(--ink3); font-weight: 600; text-align: right; }
+    .sub-bg { height: 7px; background: var(--bg2); overflow: hidden; }
+    .sub-fill { height: 100%; transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+    .sub-val { font-size: 0.76rem; font-weight: 800; color: var(--ink2); text-align: right; }
+
+    .cmp-card { background: var(--surface); border: 1px solid var(--border); padding: 18px; margin-bottom: 14px; }
+    .cmp-title {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--ink2);
+      padding-bottom: 10px;
+      margin-bottom: 13px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .cmp-sub { font-size: 0.7rem; color: var(--ink3); font-weight: 400; }
+
+    .rg-legend { display: flex; gap: 12px; font-size: 0.73rem; font-weight: 600; margin-bottom: 8px; color: var(--ink2); }
+    .ld { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 3px; }
+    .la { background: var(--vermilion); }
+    .lb { background: var(--navy); }
+    .lm { background: var(--pine); }
+
+    .rrow { display: flex; align-items: center; gap: 7px; padding: 5px 9px; margin-bottom: 3px; }
+    .rbadge { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; color: #fff; flex-shrink: 0; }
+    .ba { background: var(--vermilion); }
+    .bb { background: var(--navy); }
+    .bm { background: var(--pine); }
+
+    .ril { width: 90px; display: flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 600; flex-shrink: 0; }
+    .ril img { width: 22px; height: 22px; object-fit: cover; border-radius: 50%; flex-shrink: 0; border: 1px solid var(--border); background: var(--bg2); }
+    .rdots { display: flex; gap: 2px; flex: 1; }
+    .rdot { flex: 1; max-width: 25px; height: 20px; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 0.58rem; font-weight: 700; color: var(--ink3); }
+    .rdot.ca { background: var(--vermilion); color: #fff; transform: scale(1.1); }
+    .rdot.cb { background: var(--navy); color: #fff; transform: scale(1.1); }
+    .rdot.cm { background: var(--pine); color: #fff; transform: scale(1.15); }
+
+    .dchip { font-size: 0.68rem; padding: 1px 5px; font-weight: 700; flex-shrink: 0; min-width: 34px; text-align: center; }
+    .dz { background: var(--pine-pale); color: var(--pine); }
+    .dn { background: #fef8e0; color: #8a6400; }
+    .df { background: var(--verm-pale); color: var(--vermilion); }
+
+    .t3g { display: grid; grid-template-columns: 1fr 1px 1fr 1px 1fr; gap: 0 12px; }
+    .t3div { background: var(--border); }
+    .t3col { display: flex; flex-direction: column; gap: 5px; }
+    .t3ttl { font-size: 0.68rem; font-weight: 700; color: var(--ink3); letter-spacing: 0.04em; text-align: center; margin-bottom: 3px; }
+    .t3chip { padding: 6px 8px; font-size: 0.8rem; font-weight: 600; text-align: center; display: flex; align-items: center; gap: 5px; justify-content: center; }
+    .t3chip img { width: 20px; height: 20px; object-fit: cover; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); }
+    .t3a { background: var(--verm-pale); color: var(--vermilion); }
+    .t3b { background: #dde8fa; color: #1e3d78; }
+    .t3s { background: var(--pine-pale); color: var(--pine); border: 1.5px solid #9fd4b4; }
+    .t3n { background: var(--bg2); color: var(--ink3); font-size: 0.75rem; text-align: center; padding: 6px; }
+
+    .cmp-ph { text-align: center; padding: 48px 20px; color: var(--ink3); }
+    .cmp-ph .e { font-size: 2.2rem; margin-bottom: 10px; }
+    .cmp-ph p { font-size: 0.86rem; }
+
+    .no-r { text-align: center; padding: 32px; color: var(--ink3); font-size: 0.86rem; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ HOME ═══════════════════ -->
+<div id="screen-home" class="screen active">
+  <div class="home-outer">
+    <div class="home-komon">🍣</div>
+    <h1 class="home-title">寿司相性マッチング</h1>
+    <div class="home-rule"></div>
+    <p class="home-desc">好きな寿司ネタを「食べたい順」に並べると<br>仲間との相性がわかります</p>
+
+    <div class="home-participants">
+      <div class="home-section-label">参加者</div>
+      <div id="pList"></div>
+    </div>
+
+    <div id="homeNotice" class="home-notice"></div>
+
+    <div class="home-actions">
+      <button class="btn-primary" onclick="showInput()">参加する</button>
+      <button class="btn-secondary" id="btnResults" onclick="goResults()" disabled>相性を見る</button>
+    </div>
+
+    <div class="home-meta">
+      <button onclick="loadSample()">サンプル</button>
+      <button onclick="resetAll()">リセット</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ INPUT ═══════════════════ -->
+<div id="screen-input" class="screen">
+  <div class="topbar">
+    <button class="btn-back" onclick="showHome()">← 戻る</button>
+    <div class="topbar-title">あなたの順番を教えてください</div>
+    <div class="topbar-spacer"></div>
+  </div>
+  <div class="input-body">
+    <div class="field-label">お名前</div>
+    <input class="name-field" id="nameInput" type="text" placeholder="名前を入力してください" maxlength="20" autocomplete="off">
+    <div class="field-label">好きな順に並べてください</div>
+    <div class="rank-note">ドラッグ＆ドロップで並べ替えができます。1位が一番食べたい。</div>
+    <ul class="rank-list" id="rankList"></ul>
+  </div>
+  <div class="submit-bar">
+    <button class="btn-primary" onclick="register()">登録する</button>
+  </div>
+</div>
+
+<!-- ═══════════════════ RESULTS ═══════════════════ -->
+<div id="screen-results" class="screen">
+  <div class="topbar">
+    <button class="btn-back" onclick="showHome()">← ホームへ</button>
+    <div class="topbar-title">相性診断結果</div>
+    <div class="topbar-spacer"></div>
+  </div>
+  <div class="results-body">
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('ranking',this)">全体ランキング</button>
+      <button class="tab-btn" onclick="switchTab('compare',this)">二人を比較</button>
+    </div>
+
+    <div id="tab-ranking" class="tab-pane active">
+      <div class="rg">
+        <div class="rc"><h3>相性ランキング</h3><div id="rankingContent"></div></div>
+        <div class="rc"><h3>スコア内訳</h3><div id="breakdownContent"></div></div>
+      </div>
+    </div>
+
+    <div id="tab-compare" class="tab-pane">
+      <div class="cmp-sel">
+        <div class="sel-wrap">
+          <label>ユーザー A</label>
+          <select class="sel" id="selA" onchange="renderCmp()"></select>
+        </div>
+        <span class="vs">VS</span>
+        <div class="sel-wrap">
+          <label>ユーザー B</label>
+          <select class="sel" id="selB" onchange="renderCmp()"></select>
+        </div>
+      </div>
+      <div id="cmpView">
+        <div class="cmp-ph"><div class="e">🔍</div><p>2人を選ぶと詳細が見られます</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ITEMS = ["サーモン","マグロ","中トロ","たまご","いくら","えび","ぶり","ホタテ","炙りえんがわ","アナゴ"];
+  const IMG_PATH = {
+    "サーモン":"./public/サーモン.png","マグロ":"./public/マグロ.png",
+    "中トロ":"./public/中トロ.png","たまご":"./public/たまご.png",
+    "いくら":"./public/いくら.png","えび":"./public/えび.png",
+    "ぶり":"./public/ぶり.png","ホタテ":"./public/ホタテ.png",
+    "炙りえんがわ":"./public/炙りえんがわ.png","アナゴ":"./public/アナゴ.png"
+  };
+  // ICON is kept for backward compat (unused, images used instead)
+  const ICON = {};
+  const W     = {rd:0.50, t3:0.20, po:0.30}; // rdScore強化に合わせ重み調整
+
+  let users = [], uid = 0, curOrder = [...ITEMS], dragItem = null;
+
+  // ── SCREENS ──
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function showHome(msg) {
+    // render participants
+    const pl = document.getElementById('pList');
+    pl.innerHTML = users.length === 0
+      ? '<div class="no-p">まだ誰も参加していません</div>'
+      : '<div class="participant-list">' + users.map(u =>
+          `<div class="participant-chip"><div class="p-dot"></div>${esc(u.name)}</div>`
+        ).join('') + '</div>';
+
+    document.getElementById('btnResults').disabled = users.length < 2;
+
+    const n = document.getElementById('homeNotice');
+    if (msg) { n.textContent = msg; n.classList.add('show'); }
+    else { n.classList.remove('show'); }
+
+    show('screen-home');
+  }
+
+  function showInput() {
+    curOrder = [...ITEMS];
+    document.getElementById('nameInput').value = '';
+    renderList();
+    show('screen-input');
+  }
+
+  function goResults() {
+    if (users.length < 2) return;
+    const pairs = [];
+    for (let i = 0; i < users.length; i++)
+      for (let j = i+1; j < users.length; j++)
+        pairs.push(compat(users[i], users[j]));
+    pairs.sort((a,b) => b.total - a.total);
+    renderResults(pairs);
+    show('screen-results');
+  }
+
+  // ── INPUT ──
+  function renderList() {
+    document.getElementById('rankList').innerHTML = curOrder.map((item, i) => `
+      <li class="rank-item" draggable="true" data-item="${item}"
+          ondragstart="ds(event)" ondragover="dov(event)"
+          ondragenter="den(event)" ondragleave="dlv(event)"
+          ondrop="drp(event)" ondragend="dend(event)">
+        <span class="rank-n ${i<3?'top':''}">${i+1}</span>
+        <img class="rank-icon" src="${IMG_PATH[item]}" alt="${item}">
+        <span class="rank-label">${item}</span>
+        <span class="rank-handle">⠿</span>
+      </li>`).join('');
+  }
+
+  function register() {
+    const name = document.getElementById('nameInput').value.trim();
+    if (!name) { alert('名前を入力してください。'); return; }
+    uid++;
+    users.push({id: uid, name, order: [...curOrder]});
+    if (users.length >= 2) goResults();
+    else showHome(`✓ ${name} さんが登録されました。次の人に渡してください。`);
+  }
+
+  // ── DRAG & DROP (live DOM reorder — no re-render on drop) ──
+  let dragItemEl = null;
+
+  function ds(e) {
+    dragItemEl = e.currentTarget;
+    dragItem = dragItemEl.dataset.item;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragItem);
+    // Defer .dragging so browser captures ghost image at full opacity first
+    requestAnimationFrame(() => {
+      if (dragItemEl) dragItemEl.classList.add('dragging');
+    });
+  }
+
+  function dov(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!dragItemEl) return;
+    const list = document.getElementById('rankList');
+    const after = dragAfterEl(list, e.clientY);
+    if (after == null) {
+      list.appendChild(dragItemEl);
+    } else if (after !== dragItemEl) {
+      list.insertBefore(dragItemEl, after);
+    }
+    updateNums(list);
+  }
+
+  function den(e) { e.preventDefault(); }
+  function dlv(e) {}
+
+  function drp(e) {
+    e.preventDefault();
+    // Order is already correct in DOM — just sync to data
+    const list = document.getElementById('rankList');
+    curOrder = [...list.querySelectorAll('.rank-item')].map(el => el.dataset.item);
+  }
+
+  function dend(e) {
+    if (dragItemEl) { dragItemEl.classList.remove('dragging'); dragItemEl = null; }
+    dragItem = null;
+  }
+
+  function dragAfterEl(container, y) {
+    const els = [...container.querySelectorAll('.rank-item:not(.dragging)')];
+    return els.reduce((closest, el) => {
+      const { top, height } = el.getBoundingClientRect();
+      const offset = y - top - height / 2;
+      return (offset < 0 && offset > closest.offset) ? { offset, element: el } : closest;
+    }, { offset: -Infinity }).element;
+  }
+
+  function updateNums(list) {
+    [...list.querySelectorAll('.rank-item')].forEach((el, i) => {
+      const n = el.querySelector('.rank-n');
+      if (n) { n.textContent = i + 1; n.className = `rank-n${i < 3 ? ' top' : ''}`; }
+    });
+  }
+
+  // ── SCORING ──
+  // rdScore: 二乗ペナルティ — 順位差に対して非線形に厳しく評価（全一致=1.0）
+  function rdScore(a, b) {
+    const n = a.length;
+    return ITEMS.reduce((s, x) => {
+      const d = Math.abs(a.indexOf(x) - b.indexOf(x)) / (n - 1);
+      return s + (1 - d) * (1 - d); // 線形より大幅に散らばる
+    }, 0) / n;
+  }
+  // t3Score: 上位3件の一致（完全一致=1.0）
+  function t3Score(a, b) {
+    const s = new Set(a.slice(0, 3));
+    return b.slice(0, 3).filter(x => s.has(x)).length / 3;
+  }
+  // poScore: ペア順序一致率（Kendall tau、全一致=1.0）
+  function poScore(a, b) {
+    const n = a.length; let m = 0;
+    for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) {
+      const ai=a.indexOf(ITEMS[i]),aj=a.indexOf(ITEMS[j]);
+      const bi=b.indexOf(ITEMS[i]),bj=b.indexOf(ITEMS[j]);
+      if ((ai<aj)===(bi<bj)) m++;
+    }
+    return m / (n*(n-1)/2);
+  }
+  function compat(uA, uB) {
+    const s1=rdScore(uA.order,uB.order), s2=t3Score(uA.order,uB.order), s3=poScore(uA.order,uB.order);
+    return {userA:uA, userB:uB, total:Math.round((W.rd*s1+W.t3*s2+W.po*s3)*100), bd:{rd:Math.round(s1*100),t3:Math.round(s2*100),po:Math.round(s3*100)}};
+  }
+
+  // ── RESULTS RENDER ──
+  function slbl(s) { return s>=80?{t:'大親友',c:'tag-hi'}:s>=65?{t:'仲良し',c:'tag-hi'}:s>=50?{t:'まあまあ',c:'tag-mid'}:{t:'真逆',c:'tag-lo'}; }
+  function scol(s) { return s>=70?'var(--vermilion)':s>=50?'#a06800':'#4a68a0'; }
+  function cchip(s){ return s>=70?'chip-hi':s>=50?'chip-mid':'chip-lo'; }
+  function esc(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+  function renderResults(pairs) {
+    const medals = ['🥇','🥈','🥉'];
+
+    document.getElementById('rankingContent').innerHTML = pairs.map((p,i) => {
+      const lbl=slbl(p.total), col=scol(p.total), aN=esc(p.userA.name), bN=esc(p.userB.name);
+      return `<div class="pair-row">
+        <div class="pair-l">
+          <span class="p-medal">${medals[i]||`${i+1}.`}</span>
+          <span class="p-names">${aN} × ${bN}</span>
+          <span class="p-tag ${lbl.c}">${lbl.t}</span>
+        </div>
+        <div class="p-score">
+          <div class="sbar-bg"><div class="sbar-fill" style="width:${p.total}%;background:${col}"></div></div>
+          <span class="sval" style="color:${col}">${p.total}<small style="font-size:0.58rem;font-weight:600;font-family:var(--fn)">点</small></span>
+        </div></div>`;
+    }).join('') || '<div class="no-r">ペアがありません</div>';
+
+    document.getElementById('breakdownContent').innerHTML = `
+      <table class="bk-table"><thead><tr>
+        <th>ペア</th><th>総合</th>
+        <th>順位差<span class="wh">40%</span></th>
+        <th>上位3件<span class="wh">30%</span></th>
+        <th>順序<span class="wh">30%</span></th>
+      </tr></thead><tbody>
+      ${pairs.map(p=>`<tr>
+        <td>${esc(p.userA.name)} × ${esc(p.userB.name)}</td>
+        <td><span class="chip ${cchip(p.total)}">${p.total}</span></td>
+        <td><span class="chip chip-sub">${p.bd.rd}</span></td>
+        <td><span class="chip chip-sub">${p.bd.t3}</span></td>
+        <td><span class="chip chip-sub">${p.bd.po}</span></td>
+      </tr>`).join('')}
+      </tbody></table>`;
+
+    const opts = users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
+    document.getElementById('selA').innerHTML = opts;
+    document.getElementById('selB').innerHTML = opts;
+    if (pairs.length > 0) {
+      document.getElementById('selA').value = pairs[0].userA.id;
+      document.getElementById('selB').value = pairs[0].userB.id;
+    }
+    document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
+    document.querySelectorAll('.tab-pane').forEach((p,i)=>p.classList.toggle('active',i===0));
+  }
+
+  // ── TABS ──
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${name}`).classList.add('active');
+    if (name==='compare') renderCmp();
+  }
+
+  // ── COMPARE ──
+  function renderCmp() {
+    const idA=Number(document.getElementById('selA').value), idB=Number(document.getElementById('selB').value);
+    const uA=users.find(u=>u.id===idA), uB=users.find(u=>u.id===idB);
+    const v = document.getElementById('cmpView');
+    if (!uA||!uB||idA===idB) { v.innerHTML='<div class="cmp-ph"><div class="e">⚠️</div><p>異なる2人を選んでください</p></div>'; return; }
+    const r=compat(uA,uB);
+    v.innerHTML = cmpScoreCard(r,uA.name,uB.name) + cmpRankGrid(uA.order,uB.order,uA.name,uB.name) + cmpTop3(uA.order,uB.order,uA.name,uB.name);
+  }
+
+  function cmpScoreCard(r,nA,nB) {
+    const col=scol(r.total), lbl=slbl(r.total);
+    return `<div class="cmp-score-card">
+      <div class="score-big">
+        <div class="score-num" style="color:${col}">${r.total}<span class="score-unit">点</span></div>
+        <div class="score-lbl" style="color:${col}">${lbl.t}</div>
+        <div class="score-pair">${esc(nA)} × ${esc(nB)}</div>
+      </div>
+      <div class="sub-scores">
+        ${[{n:'順位差 (40%)',v:r.bd.rd,c:'var(--vermilion)'},{n:'上位3件 (30%)',v:r.bd.t3,c:'#a06800'},{n:'順序一致 (30%)',v:r.bd.po,c:'var(--navy)'}]
+          .map(b=>`<div class="sub-row"><span class="sub-name">${b.n}</span><div class="sub-bg"><div class="sub-fill" style="width:${b.v}%;background:${b.c}"></div></div><span class="sub-val">${b.v}</span></div>`).join('')}
+      </div></div>`;
+  }
+
+  function cmpRankGrid(oA,oB,nA,nB) {
+    const n=ITEMS.length;
+    const sorted=[...ITEMS].sort((x,y)=>Math.abs(oA.indexOf(x)-oB.indexOf(x))-Math.abs(oA.indexOf(y)-oB.indexOf(y)));
+    const posH = Array.from({length:n},(_,i)=>`<div style="flex:1;max-width:25px;text-align:center;font-size:0.58rem;color:var(--ink3);font-weight:600">${i+1}</div>`).join('');
+    const rows = sorted.map(item=>{
+      const ra=oA.indexOf(item), rb=oB.indexOf(item), d=Math.abs(ra-rb);
+      const bg=d===0?'#edf7f1':d<=2?'#fefdf0':'#fdf2f4';
+      const dc=d===0?'dz':d<=2?'dn':'df', dt=d===0?'⭐一致':`差${d}`;
+      const dots=Array.from({length:n},(_,i)=>{let c=''; if(i===ra&&i===rb)c='cm'; else if(i===ra)c='ca'; else if(i===rb)c='cb'; return `<div class="rdot ${c}">${i+1}</div>`;}).join('');
+      const bA=ra===rb?'bm':'ba', bB=ra===rb?'bm':'bb';
+      return `<div class="rrow" style="background:${bg}">
+        <div class="rbadge ${bA}">${ra+1}</div>
+        <span class="ril"><img src="${IMG_PATH[item]}" alt="${item}">${item}</span>
+        <div class="rdots">${dots}</div>
+        <div class="rbadge ${bB}">${rb+1}</div>
+        <span class="dchip ${dc}">${dt}</span>
+      </div>`;
+    }).join('');
+    return `<div class="cmp-card">
+      <div class="cmp-title">ネタ別 順位比較<span class="cmp-sub">— 一致しているネタが上</span></div>
+      <div class="rg-legend">
+        <span><span class="ld la"></span>${esc(nA)}</span>
+        <span><span class="ld lb"></span>${esc(nB)}</span>
+        <span><span class="ld lm"></span>完全一致</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;padding:0 9px 3px;font-size:0.65rem;color:var(--ink3)">
+        <div style="width:20px"></div><div style="width:72px"></div>
+        <div style="display:flex;gap:2px;flex:1">${posH}</div>
+        <div style="width:20px"></div><div style="min-width:34px"></div>
+      </div>
+      ${rows}</div>`;
+  }
+
+  function cmpTop3(oA,oB,nA,nB) {
+    const t3A=oA.slice(0,3), t3B=oB.slice(0,3);
+    const sh=new Set(t3A.filter(x=>t3B.includes(x)));
+    const onA=t3A.filter(x=>!sh.has(x)), onB=t3B.filter(x=>!sh.has(x)), shA=[...sh];
+    const sc=sh.size, slbl=sc===3?'トップ3が完全一致！':sc===2?'2ネタが共通':sc===1?'1ネタが共通':'共通なし';
+    const mk=(arr,cls)=>arr.length?arr.map(x=>`<div class="t3chip ${cls}"><img src="${IMG_PATH[x]}" alt="${x}">${x}</div>`).join(''):'<div class="t3n">なし</div>';
+    return `<div class="cmp-card">
+      <div class="cmp-title">トップ3 比較<span class="cmp-sub">— ${slbl}</span></div>
+      <div class="t3g">
+        <div class="t3col"><div class="t3ttl">🔴 ${esc(nA)}だけ</div>${mk(onA,'t3a')}</div>
+        <div class="t3div"></div>
+        <div class="t3col"><div class="t3ttl">🟢 ふたりとも</div>${mk(shA,'t3s')}</div>
+        <div class="t3div"></div>
+        <div class="t3col"><div class="t3ttl">🔵 ${esc(nB)}だけ</div>${mk(onB,'t3b')}</div>
+      </div></div>`;
+  }
+
+  // ── SAMPLE / RESET ──
+  function loadSample() {
+    users = [
+      {id:++uid,name:'Aさん',order:["サーモン","中トロ","マグロ","いくら","えび","ぶり","ホタテ","たまご","炙りえんがわ","アナゴ"]},
+      {id:++uid,name:'Bさん',order:["マグロ","サーモン","中トロ","えび","いくら","たまご","ぶり","炙りえんがわ","ホタテ","アナゴ"]},
+      {id:++uid,name:'Cさん',order:["いくら","中トロ","マグロ","えび","サーモン","ぶり","アナゴ","たまご","ホタテ","炙りえんがわ"]},
+      {id:++uid,name:'Dさん',order:["えび","ホタテ","アナゴ","炙りえんがわ","たまご","ぶり","サーモン","マグロ","いくら","中トロ"]},
+    ];
+    showHome('✓ サンプルデータを読み込みました');
+  }
+
+  function resetAll() {
+    if (!confirm('全データをリセットしますか？')) return;
+    users = []; uid = 0;
+    showHome();
+  }
+
+  // ── INIT ──
+  showHome();
+</script>
+</body>
+</html>
