@@ -793,7 +793,11 @@
         <button class="group-code-copy" onclick="copyGroupCode()">コピー</button>
       </div>
       <div id="groupMembersList" class="group-members">メンバー確認中…</div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="btn-share line" style="flex:1" onclick="shareGroupLine()">💬 LINEで招待</button>
+        <button class="btn-share" style="flex:1" onclick="copyGroupInvite()">🔗 URLをコピー</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
         <button class="btn-primary" onclick="showInput()">順位を登録する</button>
         <button class="btn-secondary" onclick="uiViewGroupResults(this)">グループの結果を見る</button>
         <button class="btn-secondary" style="font-size:0.82rem;color:var(--ink3)"
@@ -1438,6 +1442,16 @@
 
   function initFromUrl() {
     const params = new URLSearchParams(window.location.search);
+
+    // グループ招待URL (?g=XXXXXX)
+    const g = params.get('g');
+    if (g) {
+      groupCode = g.toUpperCase();
+      showHome(`グループ ${groupCode} に参加しました！`);
+      return;
+    }
+
+    // 結果共有URL (?d=...)
     const d = params.get('d');
     if (!d) { showHome(); return; }
     const state = decodeState(d);
@@ -1531,6 +1545,32 @@
     } catch (e) {
       alert('グループへの参加に失敗しました。合言葉を確認してください。');
     }
+  }
+
+  function getGroupInviteUrl() {
+    const base = window.location.href.split('?')[0];
+    return `${base}?g=${groupCode}`;
+  }
+
+  function shareGroupLine() {
+    const url = getGroupInviteUrl();
+    const text = `寿司相性マッチングで遊ぼう！🍣\n合言葉: ${groupCode}\nURLから直接参加できます👇`;
+    window.open(
+      `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
+      '_blank'
+    );
+  }
+
+  function copyGroupInvite() {
+    const url = getGroupInviteUrl();
+    navigator.clipboard.writeText(url).then(() => {
+      const btn = event.currentTarget;
+      const orig = btn.textContent;
+      btn.textContent = '✓ コピーしました！';
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    }).catch(() => {
+      prompt('以下のURLをコピーしてください', url);
+    });
   }
 
   function uiLeaveGroup() {
