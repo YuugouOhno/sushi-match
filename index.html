@@ -178,6 +178,27 @@
     }
     .home-notice.show { display: block; }
 
+    /* Mode selector */
+    .mode-sel { margin-bottom: 28px; }
+    .mode-btns { display: flex; gap: 6px; }
+    .mode-btn {
+      flex: 1;
+      padding: 10px 6px;
+      border: 1.5px solid var(--border2);
+      background: var(--surface);
+      font-family: var(--fn);
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--ink2);
+      cursor: pointer;
+      transition: all 0.15s;
+      line-height: 1.2;
+    }
+    .mode-btn:hover:not(:disabled) { border-color: var(--vermilion); color: var(--vermilion); }
+    .mode-btn.active { background: var(--vermilion); border-color: var(--vermilion); color: #fff; }
+    .mode-btn:disabled { opacity: 0.4; cursor: default; }
+    .mode-wip { display: block; font-size: 0.62rem; font-weight: 600; margin-top: 2px; opacity: 0.9; }
+
     .home-meta {
       margin-top: 40px;
       display: flex;
@@ -568,6 +589,15 @@
     <div class="home-rule"></div>
     <p class="home-desc">好きな寿司ネタを「食べたい順」に並べると<br>仲間との相性がわかります</p>
 
+    <div class="mode-sel">
+      <div class="home-section-label">ネタ数</div>
+      <div class="mode-btns">
+        <button class="mode-btn" data-mode="5" onclick="setMode(5)">5皿</button>
+        <button class="mode-btn active" data-mode="10" onclick="setMode(10)">10皿</button>
+        <button class="mode-btn" data-mode="20" onclick="setMode(20)">20皿</button>
+      </div>
+    </div>
+
     <div class="home-participants">
       <div class="home-section-label">参加者</div>
       <div id="pList"></div>
@@ -646,19 +676,30 @@
 </div>
 
 <script>
-  const ITEMS = ["サーモン","マグロ","中トロ","たまご","いくら","えび","ぶり","ホタテ","炙りえんがわ","アナゴ"];
-  const IMG_PATH = {
-    "サーモン":"./public/サーモン.png","マグロ":"./public/マグロ.png",
-    "中トロ":"./public/中トロ.png","たまご":"./public/たまご.png",
-    "いくら":"./public/いくら.png","えび":"./public/えび.png",
-    "ぶり":"./public/ぶり.png","ホタテ":"./public/ホタテ.png",
-    "炙りえんがわ":"./public/炙りえんがわ.png","アナゴ":"./public/アナゴ.png"
+  const ITEMS_POOL = {
+    5:  ["マグロ","サーモン","いくら","えび","アナゴ"],
+    10: ["マグロ","サーモン","いくら","えび","アナゴ","中トロ","たまご","ホタテ","ぶり","うに"],
+    20: ["マグロ","サーモン","いくら","えび","アナゴ","中トロ","たまご","ホタテ","ぶり","うに",
+         "大トロ","炙りえんがわ","イカ","たこ","はまち","タイ","カツオ","イワシ","しらす","かずのこ"]
   };
-  // ICON is kept for backward compat (unused, images used instead)
-  const ICON = {};
-  const W     = {rd:0.50, t3:0.20, po:0.30}; // rdScore強化に合わせ重み調整
+  const IMG_PATH = {
+    "マグロ":"./public/マグロ.png","サーモン":"./public/サーモン.png",
+    "いくら":"./public/いくら.png","えび":"./public/えび.png",
+    "アナゴ":"./public/アナゴ.png","中トロ":"./public/中トロ.png",
+    "たまご":"./public/たまご.png","ホタテ":"./public/ホタテ.png",
+    "ぶり":"./public/ぶり.png","うに":"./public/うに.png",
+    "大トロ":"./public/大トロ.png","炙りえんがわ":"./public/炙りえんがわ.png",
+    "イカ":"./public/イカ.png","たこ":"./public/たこ.png",
+    "はまち":"./public/はまち.png","タイ":"./public/タイ.png",
+    "カツオ":"./public/カツオ.png","イワシ":"./public/イワシ.png",
+    "しらす":"./public/しらす.png","かずのこ":"./public/かずのこ.png"
+  };
+  const W = {rd:0.50, t3:0.20, po:0.30};
 
-  let users = [], uid = 0, curOrder = [...ITEMS], dragItem = null;
+  let mode = 10;
+  function getItems() { return ITEMS_POOL[mode]; }
+
+  let users = [], uid = 0, curOrder = [...getItems()], dragItem = null;
 
   // ── SCREENS ──
   function show(id) {
@@ -686,7 +727,7 @@
   }
 
   function showInput() {
-    curOrder = [...ITEMS];
+    curOrder = [...getItems()];
     document.getElementById('nameInput').value = '';
     renderList();
     show('screen-input');
@@ -722,8 +763,18 @@
     if (!name) { alert('名前を入力してください。'); return; }
     uid++;
     users.push({id: uid, name, order: [...curOrder]});
-    if (users.length >= 2) goResults();
-    else showHome(`✓ ${name} さんが登録されました。次の人に渡してください。`);
+    showHome(`✓ ${name} さんが登録されました。次の人に渡してください。`);
+  }
+
+  function setMode(m) {
+    if (m === mode) return;
+    if (users.length > 0) {
+      if (!confirm(`モードを${m}皿に変えるとデータがリセットされます。よろしいですか？`)) return;
+    }
+    mode = m;
+    users = []; uid = 0;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === String(m)));
+    showHome();
   }
 
   // ── DRAG & DROP (live DOM reorder — no re-render on drop) ──
@@ -789,9 +840,9 @@
   // rdScore: 二乗ペナルティ — 順位差に対して非線形に厳しく評価（全一致=1.0）
   function rdScore(a, b) {
     const n = a.length;
-    return ITEMS.reduce((s, x) => {
+    return getItems().reduce((s, x) => {
       const d = Math.abs(a.indexOf(x) - b.indexOf(x)) / (n - 1);
-      return s + (1 - d) * (1 - d); // 線形より大幅に散らばる
+      return s + (1 - d) * (1 - d);
     }, 0) / n;
   }
   // t3Score: 上位3件の一致（完全一致=1.0）
@@ -801,10 +852,11 @@
   }
   // poScore: ペア順序一致率（Kendall tau、全一致=1.0）
   function poScore(a, b) {
+    const items = getItems();
     const n = a.length; let m = 0;
     for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) {
-      const ai=a.indexOf(ITEMS[i]),aj=a.indexOf(ITEMS[j]);
-      const bi=b.indexOf(ITEMS[i]),bj=b.indexOf(ITEMS[j]);
+      const ai=a.indexOf(items[i]),aj=a.indexOf(items[j]);
+      const bi=b.indexOf(items[i]),bj=b.indexOf(items[j]);
       if ((ai<aj)===(bi<bj)) m++;
     }
     return m / (n*(n-1)/2);
@@ -840,8 +892,8 @@
     document.getElementById('breakdownContent').innerHTML = `
       <table class="bk-table"><thead><tr>
         <th>ペア</th><th>総合</th>
-        <th>順位差<span class="wh">40%</span></th>
-        <th>上位3件<span class="wh">30%</span></th>
+        <th>順位差<span class="wh">50%</span></th>
+        <th>上位3件<span class="wh">20%</span></th>
         <th>順序<span class="wh">30%</span></th>
       </tr></thead><tbody>
       ${pairs.map(p=>`<tr>
@@ -892,14 +944,14 @@
         <div class="score-pair">${esc(nA)} × ${esc(nB)}</div>
       </div>
       <div class="sub-scores">
-        ${[{n:'順位差 (40%)',v:r.bd.rd,c:'var(--vermilion)'},{n:'上位3件 (30%)',v:r.bd.t3,c:'#a06800'},{n:'順序一致 (30%)',v:r.bd.po,c:'var(--navy)'}]
+        ${[{n:'順位差 (50%)',v:r.bd.rd,c:'var(--vermilion)'},{n:'上位3件 (20%)',v:r.bd.t3,c:'#a06800'},{n:'順序一致 (30%)',v:r.bd.po,c:'var(--navy)'}]
           .map(b=>`<div class="sub-row"><span class="sub-name">${b.n}</span><div class="sub-bg"><div class="sub-fill" style="width:${b.v}%;background:${b.c}"></div></div><span class="sub-val">${b.v}</span></div>`).join('')}
       </div></div>`;
   }
 
   function cmpRankGrid(oA,oB,nA,nB) {
-    const n=ITEMS.length;
-    const sorted=[...ITEMS].sort((x,y)=>Math.abs(oA.indexOf(x)-oB.indexOf(x))-Math.abs(oA.indexOf(y)-oB.indexOf(y)));
+    const items=getItems(), n=items.length;
+    const sorted=[...items].sort((x,y)=>Math.abs(oA.indexOf(x)-oB.indexOf(x))-Math.abs(oA.indexOf(y)-oB.indexOf(y)));
     const posH = Array.from({length:n},(_,i)=>`<div style="flex:1;max-width:25px;text-align:center;font-size:0.58rem;color:var(--ink3);font-weight:600">${i+1}</div>`).join('');
     const rows = sorted.map(item=>{
       const ra=oA.indexOf(item), rb=oB.indexOf(item), d=Math.abs(ra-rb);
@@ -949,12 +1001,21 @@
 
   // ── SAMPLE / RESET ──
   function loadSample() {
-    users = [
-      {id:++uid,name:'Aさん',order:["サーモン","中トロ","マグロ","いくら","えび","ぶり","ホタテ","たまご","炙りえんがわ","アナゴ"]},
-      {id:++uid,name:'Bさん',order:["マグロ","サーモン","中トロ","えび","いくら","たまご","ぶり","炙りえんがわ","ホタテ","アナゴ"]},
-      {id:++uid,name:'Cさん',order:["いくら","中トロ","マグロ","えび","サーモン","ぶり","アナゴ","たまご","ホタテ","炙りえんがわ"]},
-      {id:++uid,name:'Dさん',order:["えび","ホタテ","アナゴ","炙りえんがわ","たまご","ぶり","サーモン","マグロ","いくら","中トロ"]},
+    const sample10 = [
+      {name:'Aさん',order:["サーモン","中トロ","マグロ","いくら","えび","ぶり","ホタテ","たまご","炙りえんがわ","アナゴ"]},
+      {name:'Bさん',order:["マグロ","サーモン","中トロ","えび","いくら","たまご","ぶり","炙りえんがわ","ホタテ","アナゴ"]},
+      {name:'Cさん',order:["いくら","中トロ","マグロ","えび","サーモン","ぶり","アナゴ","たまご","ホタテ","炙りえんがわ"]},
+      {name:'Dさん',order:["えび","ホタテ","アナゴ","炙りえんがわ","たまご","ぶり","サーモン","マグロ","いくら","中トロ"]},
     ];
+    const sample5 = [
+      {name:'Aさん',order:["サーモン","中トロ","マグロ","いくら","えび"]},
+      {name:'Bさん',order:["マグロ","サーモン","いくら","えび","中トロ"]},
+      {name:'Cさん',order:["いくら","中トロ","えび","サーモン","マグロ"]},
+      {name:'Dさん',order:["えび","マグロ","サーモン","中トロ","いくら"]},
+    ];
+    const samples = mode === 5 ? sample5 : sample10;
+    users = []; uid = 0;
+    samples.forEach(s => users.push({id: ++uid, name: s.name, order: s.order}));
     showHome('✓ サンプルデータを読み込みました');
   }
 
