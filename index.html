@@ -629,6 +629,72 @@
     .avg-toggle-btn.active { background: var(--verm-pale); border-color: var(--vermilion); color: var(--vermilion); }
     #avgCompareSection { margin-bottom: 20px; }
 
+    /* ── GROUP SECTION ── */
+    .home-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 28px 0 16px;
+      color: var(--ink3);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+    }
+    .home-divider::before, .home-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .group-code-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      background: var(--pine-pale);
+      border: 1px solid var(--pine);
+      margin-bottom: 10px;
+    }
+    .group-code-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--pine);
+      flex-shrink: 0;
+    }
+    .group-code-value {
+      font-family: var(--fn);
+      font-size: 1.4rem;
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      color: var(--pine);
+      flex: 1;
+    }
+    .group-code-copy {
+      background: none;
+      border: 1px solid var(--pine);
+      color: var(--pine);
+      font-family: var(--fn);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .group-code-copy:hover { background: var(--pine); color: #fff; }
+
+    .group-members {
+      font-size: 0.82rem;
+      color: var(--ink2);
+      padding: 9px 12px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      margin-bottom: 2px;
+      min-height: 38px;
+    }
+
     /* ── MOBILE OVERRIDES ── */
     @media (max-width: 480px) {
       .home-outer { padding: 36px 16px 72px; }
@@ -696,6 +762,43 @@
     <div class="home-actions">
       <button class="btn-primary" onclick="showInput()">参加する</button>
       <button class="btn-secondary" id="btnResults" onclick="goResults()" disabled>相性を見る</button>
+    </div>
+
+    <!-- ── グループ機能 ── -->
+    <div class="home-divider" id="groupDivider">グループで遊ぶ</div>
+
+    <div id="groupIdlePanel">
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary" style="flex:1" onclick="uiCreateGroup(this)">グループを作る</button>
+        <button class="btn-secondary" style="flex:1" onclick="uiShowJoin()">グループに参加</button>
+      </div>
+    </div>
+
+    <div id="groupJoinPanel" style="display:none">
+      <div class="field-label" style="margin-bottom:7px">合言葉（6文字）</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input class="name-field" id="groupCodeInput" placeholder="例：SUSHI8" maxlength="6"
+               style="margin-bottom:0;flex:1;text-transform:uppercase;letter-spacing:0.12em"
+               oninput="this.value=this.value.toUpperCase()">
+        <button class="btn-primary" style="width:auto;padding:11px 18px;white-space:nowrap"
+                onclick="uiJoinGroup()">参加</button>
+      </div>
+      <button class="btn-secondary" onclick="uiCancelJoin()">キャンセル</button>
+    </div>
+
+    <div id="groupActivePanel" style="display:none">
+      <div class="group-code-box">
+        <span class="group-code-label">合言葉</span>
+        <strong class="group-code-value" id="groupCodeDisplay"></strong>
+        <button class="group-code-copy" onclick="copyGroupCode()">コピー</button>
+      </div>
+      <div id="groupMembersList" class="group-members">メンバー確認中…</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+        <button class="btn-primary" onclick="showInput()">順位を登録する</button>
+        <button class="btn-secondary" onclick="uiViewGroupResults(this)">グループの結果を見る</button>
+        <button class="btn-secondary" style="font-size:0.82rem;color:var(--ink3)"
+                onclick="uiLeaveGroup()">グループを抜ける</button>
+      </div>
     </div>
 
     <div class="home-meta">
@@ -800,6 +903,18 @@
 
   let users = [], uid = 0, curOrder = [...getItems()], dragItem = null;
 
+  // ── GROUP MODE ──
+  // GASウェブアプリのURL（clasp deploy 後に設定）
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbygNE7BLa7wo6H9PA24hnOXBtriHIzm6AQMZ2Tn_FEV0h_bPtTgruuH_HdJ-qgcrgzapA/exec';
+  let groupCode = null;
+
+  async function gasCall(data) {
+    const url = `${GAS_URL}?data=${encodeURIComponent(JSON.stringify(data))}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
   // ── SCREENS ──
   function show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -808,15 +923,42 @@
   }
 
   function showHome(msg) {
-    // render participants
-    const pl = document.getElementById('pList');
-    pl.innerHTML = users.length === 0
-      ? '<div class="no-p">まだ誰も参加していません</div>'
-      : '<div class="participant-list">' + users.map(u =>
-          `<div class="participant-chip"><div class="p-dot"></div>${esc(u.name)}</div>`
-        ).join('') + '</div>';
+    const inGroup = !!groupCode;
 
-    document.getElementById('btnResults').disabled = users.length < 2;
+    // グループモード時はローカル要素を隠す
+    document.querySelector('.mode-sel').style.display        = inGroup ? 'none' : '';
+    document.querySelector('.home-participants').style.display = inGroup ? 'none' : '';
+    document.querySelector('.home-actions').style.display    = inGroup ? 'none' : '';
+    document.getElementById('groupDivider').style.display    = inGroup ? 'none' : '';
+    document.getElementById('groupIdlePanel').style.display  = inGroup ? 'none' : '';
+    document.getElementById('groupJoinPanel').style.display  = 'none';
+    document.getElementById('groupActivePanel').style.display = inGroup ? '' : 'none';
+
+    if (inGroup) {
+      document.getElementById('groupCodeDisplay').textContent = groupCode;
+      // メンバー一覧を非同期で更新
+      gasCall({ action: 'getGroupStatus', groupCode }).then(res => {
+        const ml = document.getElementById('groupMembersList');
+        if (res.success) {
+          ml.textContent = res.members.length === 0
+            ? 'まだ誰も登録していません'
+            : `登録済み: ${res.members.map(m => m.name).join('、')} （${res.members.length}人）`;
+        } else {
+          ml.textContent = res.error || 'メンバーの取得に失敗しました';
+        }
+      }).catch(() => {
+        document.getElementById('groupMembersList').textContent = 'メンバーの取得に失敗しました';
+      });
+    } else {
+      // ローカルモード：参加者リスト描画
+      const pl = document.getElementById('pList');
+      pl.innerHTML = users.length === 0
+        ? '<div class="no-p">まだ誰も参加していません</div>'
+        : '<div class="participant-list">' + users.map(u =>
+            `<div class="participant-chip"><div class="p-dot"></div>${esc(u.name)}</div>`
+          ).join('') + '</div>';
+      document.getElementById('btnResults').disabled = users.length < 2;
+    }
 
     const n = document.getElementById('homeNotice');
     if (msg) { n.textContent = msg; n.classList.add('show'); }
@@ -892,12 +1034,33 @@
     });
   }
 
-  function register() {
+  async function register() {
     const name = document.getElementById('nameInput').value.trim();
     if (!name) { alert('名前を入力してください。'); return; }
-    uid++;
-    users.push({id: uid, name, order: [...curOrder]});
-    showHome(`✓ ${name} さんが登録されました。次の人に渡してください。`);
+
+    if (groupCode) {
+      const btn = document.querySelector('.submit-bar .btn-primary');
+      btn.disabled = true; btn.textContent = '送信中…';
+      try {
+        const res = await gasCall({
+          action: 'submitRanking',
+          groupCode,
+          userName: name,
+          mode,
+          ranking: [...curOrder]
+        });
+        if (res.error) { alert(res.error); return; }
+        showHome(`✓ ${name} さんが登録されました！`);
+      } catch (e) {
+        alert('送信に失敗しました。ネットワークを確認してください。');
+      } finally {
+        btn.disabled = false; btn.textContent = '登録する';
+      }
+    } else {
+      uid++;
+      users.push({ id: uid, name, order: [...curOrder] });
+      showHome(`✓ ${name} さんが登録されました。次の人に渡してください。`);
+    }
   }
 
   function setMode(m) {
@@ -1319,6 +1482,97 @@
     if (!confirm('全データをリセットしますか？')) return;
     users = []; uid = 0;
     showHome();
+  }
+
+  // ── GROUP UI ──
+
+  async function uiCreateGroup(btn) {
+    if (GAS_URL === 'YOUR_GAS_WEB_APP_URL') {
+      alert('GAS_URL が設定されていません。\nindex.html の GAS_URL を設定してください。');
+      return;
+    }
+    btn.disabled = true; btn.textContent = '作成中…';
+    try {
+      const res = await gasCall({ action: 'createGroup', mode });
+      if (res.error) { alert(res.error); return; }
+      groupCode = res.groupCode;
+      showHome('グループを作りました！合言葉を友だちに教えてください。');
+    } catch (e) {
+      alert('グループの作成に失敗しました。GAS URLとデプロイ設定を確認してください。');
+    } finally {
+      btn.disabled = false; btn.textContent = 'グループを作る';
+    }
+  }
+
+  function uiShowJoin() {
+    document.getElementById('groupIdlePanel').style.display = 'none';
+    document.getElementById('groupJoinPanel').style.display = '';
+    document.getElementById('groupCodeInput').focus();
+  }
+
+  function uiCancelJoin() {
+    document.getElementById('groupCodeInput').value = '';
+    document.getElementById('groupJoinPanel').style.display = 'none';
+    document.getElementById('groupIdlePanel').style.display = '';
+  }
+
+  async function uiJoinGroup() {
+    const code = document.getElementById('groupCodeInput').value.trim().toUpperCase();
+    if (code.length !== 6) { alert('合言葉は6文字です。'); return; }
+    if (GAS_URL === 'YOUR_GAS_WEB_APP_URL') {
+      alert('GAS_URL が設定されていません。'); return;
+    }
+    try {
+      const res = await gasCall({ action: 'getGroupStatus', groupCode: code });
+      if (res.error) { alert(res.error); return; }
+      groupCode = code;
+      document.getElementById('groupJoinPanel').style.display = 'none';
+      showHome(`グループ ${code} に参加しました！`);
+    } catch (e) {
+      alert('グループへの参加に失敗しました。合言葉を確認してください。');
+    }
+  }
+
+  function uiLeaveGroup() {
+    if (!confirm('グループを抜けますか？')) return;
+    groupCode = null;
+    showHome();
+  }
+
+  function copyGroupCode() {
+    navigator.clipboard.writeText(groupCode).then(() => {
+      const btn = document.querySelector('.group-code-copy');
+      const orig = btn.textContent;
+      btn.textContent = '✓ コピー';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    }).catch(() => {
+      prompt('合言葉をコピーしてください', groupCode);
+    });
+  }
+
+  async function uiViewGroupResults(btn) {
+    btn.disabled = true; btn.textContent = '取得中…';
+    try {
+      const res = await gasCall({ action: 'getGroupStatus', groupCode });
+      if (res.error) { alert(res.error); return; }
+      if (res.members.length < 2) {
+        alert('まだ2人以上登録されていません。みんなが登録してから結果を見てください。');
+        return;
+      }
+      // グループメンバーをローカルに展開して結果画面へ
+      const groupMode = res.members[0].mode;
+      mode = groupMode;
+      document.querySelectorAll('.mode-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.mode === String(mode))
+      );
+      users = res.members.map((m, i) => ({ id: i + 1, name: m.name, order: m.ranking }));
+      uid = users.length;
+      goResults();
+    } catch (e) {
+      alert('データの取得に失敗しました。ネットワークを確認してください。');
+    } finally {
+      btn.disabled = false; btn.textContent = 'グループの結果を見る';
+    }
   }
 
   // ── INIT ──
