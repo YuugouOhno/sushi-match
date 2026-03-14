@@ -794,7 +794,7 @@
       </div>
       <div id="groupMembersList" class="group-members">メンバー確認中…</div>
       <div style="display:flex;gap:6px;margin-top:10px">
-        <button class="btn-share line" style="flex:1" onclick="shareGroupLine()">💬 LINEで招待</button>
+        <button class="btn-share line" style="flex:1" onclick="shareGroupLine()">📤 友だちを招待</button>
         <button class="btn-share" style="flex:1" onclick="copyGroupInvite()">🔗 URLをコピー</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
@@ -1552,13 +1552,22 @@
     return `${base}?g=${groupCode}`;
   }
 
-  function shareGroupLine() {
+  async function shareGroupLine() {
     const url = getGroupInviteUrl();
-    const text = `寿司相性マッチングで遊ぼう！🍣\n合言葉: ${groupCode}\nURLから直接参加できます👇`;
-    window.open(
-      `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
-      '_blank'
-    );
+    const text = `寿司相性マッチングで遊ぼう！🍣\n合言葉: ${groupCode}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: '寿司相性マッチング', text, url });
+      } catch (e) {
+        // キャンセルは無視
+      }
+    } else {
+      // デスクトップ等フォールバック
+      window.open(
+        `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
+        '_blank'
+      );
+    }
   }
 
   function copyGroupInvite() {
