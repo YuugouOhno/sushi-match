@@ -905,7 +905,9 @@
   let mode = 10;
   function getItems() { return ITEMS_POOL[mode]; }
 
-  let users = [], uid = 0, curOrder = [...getItems()], dragItem = null;
+  const usersByMode = {5:[], 10:[], 20:[]};
+  function getUsers() { return usersByMode[mode]; }
+  let curOrder = [...getItems()], dragItem = null;
 
   // ── GROUP MODE ──
   // GASウェブアプリのURL（clasp deploy 後に設定）
@@ -929,8 +931,6 @@
   function showHome(msg) {
     const inGroup = !!groupCode;
 
-    // グループモード時はローカル要素を隠す
-    document.querySelector('.mode-sel').style.display        = inGroup ? 'none' : '';
     document.querySelector('.home-participants').style.display = inGroup ? 'none' : '';
     document.querySelector('.home-actions').style.display    = inGroup ? 'none' : '';
     document.getElementById('groupDivider').style.display    = inGroup ? 'none' : '';
@@ -940,13 +940,14 @@
 
     if (inGroup) {
       document.getElementById('groupCodeDisplay').textContent = groupCode;
-      // メンバー一覧を非同期で更新
+      // メンバー一覧を非同期で更新（現在のモードでフィルタ）
       gasCall({ action: 'getGroupStatus', groupCode }).then(res => {
         const ml = document.getElementById('groupMembersList');
         if (res.success) {
-          ml.textContent = res.members.length === 0
-            ? 'まだ誰も登録していません'
-            : `登録済み: ${res.members.map(m => m.name).join('、')} （${res.members.length}人）`;
+          const modeMembers = res.members.filter(m => m.mode === mode);
+          ml.textContent = modeMembers.length === 0
+            ? `${mode}皿モードはまだ誰も登録していません`
+            : `${mode}皿 登録済み: ${modeMembers.map(m => m.name).join('、')} （${modeMembers.length}人）`;
         } else {
           ml.textContent = res.error || 'メンバーの取得に失敗しました';
         }
@@ -955,6 +956,7 @@
       });
     } else {
       // ローカルモード：参加者リスト描画
+      const users = getUsers();
       const pl = document.getElementById('pList');
       pl.innerHTML = users.length === 0
         ? '<div class="no-p">まだ誰も参加していません</div>'
@@ -979,6 +981,7 @@
   }
 
   function goResults() {
+    const users = getUsers();
     if (users.length < 2) return;
     const pairs = [];
     for (let i = 0; i < users.length; i++)
@@ -1061,19 +1064,15 @@
         btn.disabled = false; btn.textContent = '登録する';
       }
     } else {
-      uid++;
-      users.push({ id: uid, name, order: [...curOrder] });
+      const users = getUsers();
+      users.push({ id: users.length + 1, name, order: [...curOrder] });
       showHome(`✓ ${name} さんが登録されました。次の人に渡してください。`);
     }
   }
 
   function setMode(m) {
     if (m === mode) return;
-    if (users.length > 0) {
-      if (!confirm(`モードを${m}皿に変えると参加者データがリセットされます。よろしいですか？`)) return;
-    }
     mode = m;
-    users = []; uid = 0;
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === String(m)));
     showHome();
   }
@@ -1188,7 +1187,7 @@
   function renderAvgCompare() {
     const avg = buildAverageUser();
     const medals = ['🥇','🥈','🥉'];
-    const rows = users.map(u => {
+    const rows = getUsers().map(u => {
       const r = compat(u, avg);
       return { name: esc(u.name), total: r.total, lbl: slbl(r.total), col: scol(r.total) };
     }).sort((a, b) => b.total - a.total);
@@ -1240,7 +1239,7 @@
       </tbody></table></div>`;
 
     const avgOpt = `<option value="avg">🍣 平均くん</option>`;
-    const opts = users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
+    const opts = getUsers().map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
     document.getElementById('selA').innerHTML = avgOpt + opts;
     document.getElementById('selB').innerHTML = avgOpt + opts;
     if (pairs.length > 0) {
@@ -1267,7 +1266,7 @@
   function buildAverageUser() {
     const items = getItems();
     const avgRanks = items.map(item => {
-      const avg = users.reduce((sum, u) => sum + u.order.indexOf(item), 0) / users.length;
+      const avg = getUsers().reduce((sum, u) => sum + u.order.indexOf(item), 0) / getUsers().length;
       return { item, avg };
     });
     avgRanks.sort((a, b) => a.avg - b.avg);
@@ -1276,7 +1275,7 @@
 
   function findUser(val) {
     if (val === 'avg') return buildAverageUser();
-    return users.find(u => u.id === Number(val));
+    return getUsers().find(u => u.id === Number(val));
   }
 
   // ── COMPARE ──
@@ -1360,6 +1359,7 @@
   let currentPairs = [];
 
   function encodeState() {
+    const users = getUsers();
     const items = getItems();
     const compact = {
       m: mode,
@@ -1429,7 +1429,7 @@
       ),
       '',
       '■ 参加者の選択順位',
-      ...users.map(u => `${u.name}: ${u.order.join(' > ')}`),
+      ...getUsers().map(u => `${u.name}: ${u.order.join(' > ')}`),
       '',
       `共有URL: ${getShareUrl()}`,
     ];
@@ -1440,13 +1440,17 @@
     a.click();
   }
 
-  function initFromUrl() {
+  async function initFromUrl() {
     const params = new URLSearchParams(window.location.search);
 
     // グループ招待URL (?g=XXXXXX)
     const g = params.get('g');
     if (g) {
       groupCode = g.toUpperCase();
+      try {
+        const res = await gasCall({ action: 'getGroupStatus', groupCode });
+        if (res.groupMode) mode = res.groupMode;
+      } catch (e) { /* モード取得失敗時はデフォルト値を使用 */ }
       showHome(`グループ ${groupCode} に参加しました！`);
       return;
     }
@@ -1457,8 +1461,7 @@
     const state = decodeState(d);
     if (!state) { showHome(); return; }
     mode = state.mode;
-    users = state.users;
-    uid = users.length;
+    usersByMode[state.mode] = state.users;
     document.querySelectorAll('.mode-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.mode === String(mode))
     );
@@ -1487,14 +1490,13 @@
         {name:'Dさん',order:["えび","ホタテ","アナゴ","炙りえんがわ","たまご","ぶり","サーモン","マグロ","いくら","中トロ","大トロ","うに","はまち","タイ","カツオ","イカ","たこ","かずのこ","イワシ","しらす"]},
       ],
     };
-    users = []; uid = 0;
-    pools[mode].forEach(s => users.push({id: ++uid, name: s.name, order: s.order}));
+    usersByMode[mode] = pools[mode].map((s, i) => ({id: i + 1, name: s.name, order: s.order}));
     showHome('✓ サンプルデータを読み込みました');
   }
 
   function resetAll() {
     if (!confirm('全データをリセットしますか？')) return;
-    users = []; uid = 0;
+    usersByMode[5] = []; usersByMode[10] = []; usersByMode[20] = [];
     showHome();
   }
 
@@ -1540,6 +1542,7 @@
       const res = await gasCall({ action: 'getGroupStatus', groupCode: code });
       if (res.error) { alert(res.error); return; }
       groupCode = code;
+      if (res.groupMode) mode = res.groupMode;
       document.getElementById('groupJoinPanel').style.display = 'none';
       showHome(`グループ ${code} に参加しました！`);
     } catch (e) {
@@ -1604,18 +1607,14 @@
     try {
       const res = await gasCall({ action: 'getGroupStatus', groupCode });
       if (res.error) { alert(res.error); return; }
-      if (res.members.length < 2) {
-        alert('まだ2人以上登録されていません。みんなが登録してから結果を見てください。');
+      // 現在のモードでフィルタ
+      const modeMembers = res.members.filter(m => m.mode === mode);
+      if (modeMembers.length < 2) {
+        alert(`${mode}皿モードはまだ2人以上登録されていません。みんなが登録してから結果を見てください。`);
         return;
       }
       // グループメンバーをローカルに展開して結果画面へ
-      const groupMode = res.members[0].mode;
-      mode = groupMode;
-      document.querySelectorAll('.mode-btn').forEach(b =>
-        b.classList.toggle('active', b.dataset.mode === String(mode))
-      );
-      users = res.members.map((m, i) => ({ id: i + 1, name: m.name, order: m.ranking }));
-      uid = users.length;
+      usersByMode[mode] = modeMembers.map((m, i) => ({ id: i + 1, name: m.name, order: m.ranking }));
       goResults();
     } catch (e) {
       alert('データの取得に失敗しました。ネットワークを確認してください。');

@@ -79,11 +79,11 @@ function getGroupStatus(data) {
   // グループ存在確認
   var gSheet = getOrCreateSheet('groups', ['groupCode', 'mode', 'createdAt']);
   var groups = gSheet.getDataRange().getValues();
-  var groupExists = false;
+  var groupMode = null;
   for (var i = 1; i < groups.length; i++) {
-    if (groups[i][0] === data.groupCode) { groupExists = true; break; }
+    if (groups[i][0] === data.groupCode) { groupMode = parseInt(groups[i][1]); break; }
   }
-  if (!groupExists) return { error: 'グループが見つかりません。合言葉を確認してください。' };
+  if (groupMode === null) return { error: 'グループが見つかりません。合言葉を確認してください。' };
 
   var rSheet = getOrCreateSheet('rankings', ['groupCode', 'userName', 'mode', 'ranking', 'submittedAt']);
   var rows = rSheet.getDataRange().getValues();
@@ -98,7 +98,7 @@ function getGroupStatus(data) {
       });
     }
   }
-  return { success: true, members: members };
+  return { success: true, groupMode: groupMode, members: members };
 }
 
 // ── ユーティリティ ──
