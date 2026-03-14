@@ -577,6 +577,71 @@
     .cmp-ph p { font-size: 0.86rem; }
 
     .no-r { text-align: center; padding: 32px; color: var(--ink3); font-size: 0.86rem; }
+
+    /* ── SHARE BAR ── */
+    .share-bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 20px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn-share {
+      padding: 8px 16px;
+      font-family: var(--fn);
+      font-size: 0.82rem;
+      font-weight: 700;
+      border: 1.5px solid var(--border2);
+      background: var(--surface);
+      color: var(--ink2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .btn-share:hover { border-color: var(--vermilion); color: var(--vermilion); }
+    .btn-share.line { background: #06c755; border-color: #06c755; color: #fff; }
+    .btn-share.line:hover { background: #05a847; border-color: #05a847; color: #fff; }
+
+    /* ── MOBILE OVERRIDES ── */
+    @media (max-width: 480px) {
+      .home-outer { padding: 36px 16px 72px; }
+      .home-title { font-size: 1.5rem; }
+      .home-desc { margin-bottom: 32px; }
+
+      .topbar { padding: 11px 12px; }
+      .topbar-title { font-size: 0.78rem; }
+      .topbar-spacer { width: 32px; }
+
+      .input-body { padding: 18px 14px 100px; }
+
+      .results-body { padding: 16px 12px 48px; }
+      .tab-btn { padding: 9px 14px; font-size: 0.82rem; }
+
+      /* スコア内訳テーブル: 横スクロール */
+      .bk-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .bk-table { min-width: 320px; }
+
+      /* サブスコア行: ラベル縮小 */
+      .sub-row { grid-template-columns: 68px 1fr 28px; gap: 6px; }
+      .sub-name { font-size: 0.64rem; }
+      .score-num { font-size: 3rem; }
+
+      /* トップ3比較: 縦積み */
+      .t3g { grid-template-columns: 1fr; gap: 8px 0; }
+      .t3div { display: none; }
+
+      /* ネタ別比較グリッド: 横スクロール */
+      .cmp-rank-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .cmp-rank-inner { min-width: 360px; }
+
+      /* シェアバー */
+      .share-bar { padding: 8px 12px; gap: 6px; }
+      .btn-share { padding: 7px 10px; font-size: 0.76rem; }
+    }
   </style>
 </head>
 <body>
@@ -642,6 +707,11 @@
     <button class="btn-back" onclick="showHome()">← ホームへ</button>
     <div class="topbar-title">相性診断結果</div>
     <div class="topbar-spacer"></div>
+  </div>
+  <div class="share-bar">
+    <button class="btn-share" id="btnCopyUrl" onclick="copyShareUrl()">🔗 URLをコピー</button>
+    <button class="btn-share line" onclick="shareToLine()">💬 LINEで共有</button>
+    <button class="btn-share" onclick="downloadResults()">⬇ ダウンロード</button>
   </div>
   <div class="results-body">
     <div class="tab-nav">
@@ -740,6 +810,7 @@
       for (let j = i+1; j < users.length; j++)
         pairs.push(compat(users[i], users[j]));
     pairs.sort((a,b) => b.total - a.total);
+    currentPairs = pairs;
     renderResults(pairs);
     show('screen-results');
   }
@@ -769,7 +840,7 @@
   function setMode(m) {
     if (m === mode) return;
     if (users.length > 0) {
-      if (!confirm(`モードを${m}皿に変えるとデータがリセットされます。よろしいですか？`)) return;
+      if (!confirm(`モードを${m}皿に変えると参加者データがリセットされます。よろしいですか？`)) return;
     }
     mode = m;
     users = []; uid = 0;
@@ -999,23 +1070,129 @@
       </div></div>`;
   }
 
+  // ── URL SHARE ──
+  let currentPairs = [];
+
+  function encodeState() {
+    const items = getItems();
+    const compact = {
+      m: mode,
+      u: users.map(u => [u.name, u.order.map(item => items.indexOf(item))])
+    };
+    return btoa(unescape(encodeURIComponent(JSON.stringify(compact))));
+  }
+
+  function decodeState(encoded) {
+    try {
+      const compact = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+      const items = ITEMS_POOL[compact.m];
+      if (!items) return null;
+      return {
+        mode: compact.m,
+        users: compact.u.map((u, i) => ({
+          id: i + 1,
+          name: u[0],
+          order: u[1].map(idx => items[idx])
+        }))
+      };
+    } catch(e) { return null; }
+  }
+
+  function getShareUrl() {
+    const url = new URL(window.location.href.split('?')[0]);
+    url.searchParams.set('d', encodeState());
+    return url.toString();
+  }
+
+  function copyShareUrl() {
+    const url = getShareUrl();
+    const btn = document.getElementById('btnCopyUrl');
+    navigator.clipboard.writeText(url).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = '✓ コピーしました！';
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    }).catch(() => {
+      prompt('以下のURLをコピーしてください', url);
+    });
+  }
+
+  function shareToLine() {
+    const url = getShareUrl();
+    const text = `寿司相性マッチングの結果を見てね！🍣`;
+    window.open(
+      `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
+      '_blank'
+    );
+  }
+
+  function downloadResults() {
+    const medals = ['🥇','🥈','🥉'];
+    const lines = [
+      '=== 寿司相性マッチング 結果 ===',
+      `モード: ${mode}皿`,
+      '',
+      '■ 相性ランキング',
+      ...currentPairs.map((p, i) => {
+        const lbl = slbl(p.total);
+        return `${medals[i] || `${i+1}位`} ${p.userA.name} × ${p.userB.name} — ${p.total}点 (${lbl.t})`;
+      }),
+      '',
+      '■ スコア内訳',
+      ...currentPairs.map(p =>
+        `  ${p.userA.name} × ${p.userB.name}: 総合${p.total} | 順位差${p.bd.rd} | 上位3件${p.bd.t3} | 順序${p.bd.po}`
+      ),
+      '',
+      '■ 参加者の選択順位',
+      ...users.map(u => `${u.name}: ${u.order.join(' > ')}`),
+      '',
+      `共有URL: ${getShareUrl()}`,
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '寿司相性結果.txt';
+    a.click();
+  }
+
+  function initFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const d = params.get('d');
+    if (!d) { showHome(); return; }
+    const state = decodeState(d);
+    if (!state) { showHome(); return; }
+    mode = state.mode;
+    users = state.users;
+    uid = users.length;
+    document.querySelectorAll('.mode-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.mode === String(mode))
+    );
+    goResults();
+  }
+
   // ── SAMPLE / RESET ──
   function loadSample() {
-    const sample10 = [
-      {name:'Aさん',order:["サーモン","中トロ","マグロ","いくら","えび","ぶり","ホタテ","たまご","炙りえんがわ","アナゴ"]},
-      {name:'Bさん',order:["マグロ","サーモン","中トロ","えび","いくら","たまご","ぶり","炙りえんがわ","ホタテ","アナゴ"]},
-      {name:'Cさん',order:["いくら","中トロ","マグロ","えび","サーモン","ぶり","アナゴ","たまご","ホタテ","炙りえんがわ"]},
-      {name:'Dさん',order:["えび","ホタテ","アナゴ","炙りえんがわ","たまご","ぶり","サーモン","マグロ","いくら","中トロ"]},
-    ];
-    const sample5 = [
-      {name:'Aさん',order:["サーモン","中トロ","マグロ","いくら","えび"]},
-      {name:'Bさん',order:["マグロ","サーモン","いくら","えび","中トロ"]},
-      {name:'Cさん',order:["いくら","中トロ","えび","サーモン","マグロ"]},
-      {name:'Dさん',order:["えび","マグロ","サーモン","中トロ","いくら"]},
-    ];
-    const samples = mode === 5 ? sample5 : sample10;
+    const pools = {
+      5:  [
+        {name:'Aさん',order:["マグロ","サーモン","いくら","えび","アナゴ"]},
+        {name:'Bさん',order:["サーモン","いくら","マグロ","アナゴ","えび"]},
+        {name:'Cさん',order:["いくら","マグロ","えび","サーモン","アナゴ"]},
+        {name:'Dさん',order:["えび","アナゴ","サーモン","マグロ","いくら"]},
+      ],
+      10: [
+        {name:'Aさん',order:["マグロ","サーモン","いくら","えび","アナゴ","中トロ","ホタテ","たまご","ぶり","うに"]},
+        {name:'Bさん',order:["サーモン","マグロ","中トロ","えび","いくら","たまご","ぶり","ホタテ","アナゴ","うに"]},
+        {name:'Cさん',order:["いくら","中トロ","マグロ","えび","サーモン","ぶり","アナゴ","たまご","ホタテ","うに"]},
+        {name:'Dさん',order:["えび","ホタテ","アナゴ","うに","たまご","ぶり","サーモン","マグロ","いくら","中トロ"]},
+      ],
+      20: [
+        {name:'Aさん',order:["大トロ","中トロ","マグロ","うに","いくら","サーモン","ホタテ","はまち","えび","ぶり","アナゴ","炙りえんがわ","たまご","タイ","イカ","カツオ","たこ","イワシ","かずのこ","しらす"]},
+        {name:'Bさん',order:["うに","大トロ","サーモン","中トロ","いくら","マグロ","えび","ぶり","ホタテ","はまち","炙りえんがわ","アナゴ","タイ","たまご","カツオ","イカ","たこ","かずのこ","イワシ","しらす"]},
+        {name:'Cさん',order:["いくら","マグロ","中トロ","えび","サーモン","ぶり","アナゴ","大トロ","ホタテ","うに","炙りえんがわ","たまご","はまち","タイ","イカ","カツオ","たこ","かずのこ","イワシ","しらす"]},
+        {name:'Dさん',order:["えび","ホタテ","アナゴ","炙りえんがわ","たまご","ぶり","サーモン","マグロ","いくら","中トロ","大トロ","うに","はまち","タイ","カツオ","イカ","たこ","かずのこ","イワシ","しらす"]},
+      ],
+    };
     users = []; uid = 0;
-    samples.forEach(s => users.push({id: ++uid, name: s.name, order: s.order}));
+    pools[mode].forEach(s => users.push({id: ++uid, name: s.name, order: s.order}));
     showHome('✓ サンプルデータを読み込みました');
   }
 
@@ -1026,7 +1203,7 @@
   }
 
   // ── INIT ──
-  showHome();
+  initFromUrl();
 </script>
 </body>
 </html>
