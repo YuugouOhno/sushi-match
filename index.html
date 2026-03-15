@@ -204,24 +204,6 @@
     .mode-btn:disabled { opacity: 0.4; cursor: default; }
     .mode-wip { display: block; font-size: 0.62rem; font-weight: 600; margin-top: 2px; opacity: 0.9; }
 
-    .home-meta {
-      margin-top: 40px;
-      display: flex;
-      gap: 18px;
-      justify-content: center;
-    }
-    .home-meta button {
-      background: none;
-      border: none;
-      font-family: var(--fn);
-      font-size: 0.76rem;
-      color: var(--ink3);
-      cursor: pointer;
-      text-decoration: underline;
-      text-underline-offset: 2px;
-      padding: 0;
-    }
-    .home-meta button:hover { color: var(--ink2); }
 
     /* ══════════════════════════════════════════
        INPUT SCREEN
@@ -772,6 +754,8 @@
     .btn-share:hover { border-color: var(--vermilion); color: var(--vermilion); }
     .btn-share.line { background: #06c755; border-color: #06c755; color: #fff; }
     .btn-share.line:hover { background: #05a847; border-color: #05a847; color: #fff; }
+    .btn-share.x { background: #000; border-color: #000; color: #fff; }
+    .btn-share.x:hover { background: #222; border-color: #222; color: #fff; }
 
     /* ── AVG TOGGLE ── */
     .avg-toggle-bar {
@@ -1096,10 +1080,6 @@
       </div>
     </div>
 
-    <div class="home-meta">
-      <button onclick="loadSample()">サンプル</button>
-      <button onclick="resetAll()">リセット</button>
-    </div>
   </div>
 </div>
 
@@ -1160,10 +1140,12 @@
         <div class="rc"><h3>スコア内訳</h3><div id="breakdownContent"></div></div>
       </div>
       <div class="avg-toggle-bar">
-        <button class="avg-toggle-btn" id="btnAvgToggle" onclick="toggleAvg()">🍣 平均くんと比較</button>
+        <button class="avg-toggle-btn" id="btnAvgToggle" onclick="toggleAvg()">🍣 平均くんと比較（世界 &amp; グループ）</button>
       </div>
       <div id="avgCompareSection" style="display:none">
-        <div class="rc"><h3>🍣 平均くんとの相性</h3><div id="avgContent"></div></div>
+        <div class="rc"><h3>🌍 世界平均くんとの相性</h3><div id="worldAvgContent"><div class="cmp-ph"><div class="e">🌍</div><p>読み込み中...</p></div></div></div>
+        <div class="rc" style="margin-top:12px"><h3>👥 グループ平均くんとの相性</h3><div id="avgContent"></div></div>
+        <div class="rc" style="margin-top:12px"><h3>🌍 × 👥 世界 vs グループ</h3><div id="worldVsGroupContent"><div class="cmp-ph"><div class="e">🌍</div><p>読み込み中...</p></div></div></div>
       </div>
     </div>
 
@@ -1315,7 +1297,7 @@
   function showInput() {
     editingUserId = null;
     curOrder = [];
-    remainingItems = [...getItems()];
+    remainingItems = shuffleArray([...getItems()]);
     document.getElementById('nameInput').value = '';
     document.getElementById('myRecordToggle').checked = false;
     document.getElementById('inputTitle').textContent = 'あなたの順番を教えてください';
@@ -1327,7 +1309,7 @@
   function showInputWithMyRecord(rec) {
     editingUserId = null;
     curOrder = [];
-    remainingItems = [...getItems()];
+    remainingItems = shuffleArray([...getItems()]);
     document.getElementById('nameInput').value = rec.name;
     document.getElementById('myRecordToggle').checked = true;
     const savedOrder = (rec.orders?.[mode] || []).filter(x => getItems().includes(x));
@@ -1345,7 +1327,7 @@
     if (!user) return;
     editingUserId = userId;
     curOrder = [...user.order];
-    remainingItems = getItems().filter(x => !curOrder.includes(x));
+    remainingItems = shuffleArray(getItems().filter(x => !curOrder.includes(x)));
     document.getElementById('nameInput').value = user.name;
     document.getElementById('myRecordToggle').checked = false;
     document.getElementById('inputTitle').textContent = '記録を編集';
@@ -1371,6 +1353,14 @@
   let remainingItems = [];
   let editingUserId = null;
 
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
   function pickItem(item) {
     const idx = remainingItems.indexOf(item);
     if (idx === -1) return;
@@ -1382,11 +1372,7 @@
   function undoLast() {
     if (!curOrder.length) return;
     const item = curOrder.pop();
-    const all = getItems();
-    const origIdx = all.indexOf(item);
-    let ins = remainingItems.findIndex(r => all.indexOf(r) > origIdx);
-    if (ins === -1) ins = remainingItems.length;
-    remainingItems.splice(ins, 0, item);
+    remainingItems.push(item);
     renderPicker();
   }
 
@@ -1569,18 +1555,17 @@
     if (avgVisible) renderAvgCompare();
   }
 
-  function renderAvgCompare() {
-    const avg = buildAverageUser();
+  function renderAvgRows(users, avgUser, labelSuffix) {
     const medals = ['🥇','🥈','🥉'];
-    const rows = getUsers().map(u => {
-      const r = compat(u, avg);
+    const rows = users.map(u => {
+      const r = compat(u, avgUser);
       return { name: esc(u.name), total: r.total, lbl: slbl(r.total), col: scol(r.total) };
     }).sort((a, b) => b.total - a.total);
-    document.getElementById('avgContent').innerHTML = rows.map((row, i) => `
+    return rows.map((row, i) => `
       <div class="pair-row">
         <div class="pair-l">
           <span class="p-medal">${medals[i]||`${i+1}.`}</span>
-          <span class="p-names">${row.name} × 平均くん</span>
+          <span class="p-names">${row.name} × ${labelSuffix}</span>
           <span class="p-tag ${row.lbl.c}">${row.lbl.t}</span>
         </div>
         <div class="p-score">
@@ -1588,6 +1573,46 @@
           <span class="sval" style="color:${row.col}">${row.total}<small style="font-size:0.58rem;font-weight:600;font-family:var(--fn)">点</small></span>
         </div>
       </div>`).join('');
+  }
+
+  async function renderAvgCompare() {
+    const groupAvg = buildAverageUser();
+    const users = getUsers();
+    // グループ平均は即時表示
+    document.getElementById('avgContent').innerHTML = renderAvgRows(users, groupAvg, 'グループ平均くん');
+    // 世界平均は非同期取得
+    document.getElementById('worldAvgContent').innerHTML = '<div class="cmp-ph"><div class="e">🌍</div><p>読み込み中...</p></div>';
+    document.getElementById('worldVsGroupContent').innerHTML = '<div class="cmp-ph"><div class="e">🌍</div><p>読み込み中...</p></div>';
+    try {
+      const res = await gasCall({ action: 'getGlobalRankings', mode });
+      if (!res.success || !res.rankings || res.rankings.length === 0) {
+        document.getElementById('worldAvgContent').innerHTML = '<div class="cmp-ph"><div class="e">🌍</div><p>まだ世界中のデータが集まっていません</p></div>';
+        document.getElementById('worldVsGroupContent').innerHTML = '<div class="cmp-ph"><div class="e">🌍</div><p>まだ世界中のデータが集まっていません</p></div>';
+        return;
+      }
+      const worldAvg = buildWorldAvgFromRankings(res.rankings);
+      const countLabel = `<div style="font-size:0.7rem;color:var(--ink3);margin-bottom:8px">世界 ${res.rankings.length} 人のデータより</div>`;
+      document.getElementById('worldAvgContent').innerHTML = countLabel + renderAvgRows(users, worldAvg, '世界平均くん');
+      // 世界 vs グループ
+      const wvg = compat(worldAvg, groupAvg);
+      const wvgCol = scol(wvg.total), wvgLbl = slbl(wvg.total);
+      document.getElementById('worldVsGroupContent').innerHTML = countLabel + `
+        <div class="pair-row">
+          <div class="pair-l">
+            <span class="p-medal">🌍</span>
+            <span class="p-names">世界平均くん × グループ平均くん</span>
+            <span class="p-tag ${wvgLbl.c}">${wvgLbl.t}</span>
+          </div>
+          <div class="p-score">
+            <div class="sbar-bg"><div class="sbar-fill" style="width:${wvg.total}%;background:${wvgCol}"></div></div>
+            <span class="sval" style="color:${wvgCol}">${wvg.total}<small style="font-size:0.58rem;font-weight:600;font-family:var(--fn)">点</small></span>
+          </div>
+        </div>` +
+        cmpRankGrid(worldAvg.order, groupAvg.order, '世界平均くん', 'グループ平均くん');
+    } catch (e) {
+      document.getElementById('worldAvgContent').innerHTML = '<div class="cmp-ph"><div class="e">⚠️</div><p>世界データの取得に失敗しました</p></div>';
+      document.getElementById('worldVsGroupContent').innerHTML = '<div class="cmp-ph"><div class="e">⚠️</div><p>世界データの取得に失敗しました</p></div>';
+    }
   }
 
   function renderResults(pairs) {
@@ -1793,6 +1818,32 @@
     });
   }
 
+  let _worldShareData = null;
+
+  function shareWorldToLine() {
+    const url = location.href.split('?')[0];
+    const d = _worldShareData;
+    const text = d
+      ? `寿司の好み、世界${d.count}人と比べたら${d.score}点！${d.tier.emoji}${d.tier.title} 🍣`
+      : `寿司相性マッチングで世界と比べてみた！🍣`;
+    window.open(
+      `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
+      '_blank'
+    );
+  }
+
+  function shareWorldToX() {
+    const url = location.href.split('?')[0];
+    const d = _worldShareData;
+    const text = d
+      ? `寿司の好み、世界${d.count}人と比べたら${d.score}点！${d.tier.emoji}${d.tier.title} 🍣`
+      : `寿司相性マッチングで世界と比べてみた！🍣`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+      '_blank'
+    );
+  }
+
   function shareToLine() {
     const url = getShareUrl();
     const text = `寿司相性マッチングの結果を見てね！🍣`;
@@ -1860,38 +1911,6 @@
       b.classList.toggle('active', b.dataset.mode === String(mode))
     );
     goResults();
-  }
-
-  // ── SAMPLE / RESET ──
-  function loadSample() {
-    const pools = {
-      5:  [
-        {name:'Aさん',order:["マグロ","サーモン","いくら","えび","アナゴ"]},
-        {name:'Bさん',order:["サーモン","いくら","マグロ","アナゴ","えび"]},
-        {name:'Cさん',order:["いくら","マグロ","えび","サーモン","アナゴ"]},
-        {name:'Dさん',order:["えび","アナゴ","サーモン","マグロ","いくら"]},
-      ],
-      10: [
-        {name:'Aさん',order:["マグロ","サーモン","いくら","えび","アナゴ","中トロ","ホタテ","たまご","ぶり","うに"]},
-        {name:'Bさん',order:["サーモン","マグロ","中トロ","えび","いくら","たまご","ぶり","ホタテ","アナゴ","うに"]},
-        {name:'Cさん',order:["いくら","中トロ","マグロ","えび","サーモン","ぶり","アナゴ","たまご","ホタテ","うに"]},
-        {name:'Dさん',order:["えび","ホタテ","アナゴ","うに","たまご","ぶり","サーモン","マグロ","いくら","中トロ"]},
-      ],
-      20: [
-        {name:'Aさん',order:["大トロ","中トロ","マグロ","うに","いくら","サーモン","ホタテ","はまち","えび","ぶり","アナゴ","炙りえんがわ","たまご","タイ","イカ","カツオ","たこ","イワシ","かずのこ","しらす"]},
-        {name:'Bさん',order:["うに","大トロ","サーモン","中トロ","いくら","マグロ","えび","ぶり","ホタテ","はまち","炙りえんがわ","アナゴ","タイ","たまご","カツオ","イカ","たこ","かずのこ","イワシ","しらす"]},
-        {name:'Cさん',order:["いくら","マグロ","中トロ","えび","サーモン","ぶり","アナゴ","大トロ","ホタテ","うに","炙りえんがわ","たまご","はまち","タイ","イカ","カツオ","たこ","かずのこ","イワシ","しらす"]},
-        {name:'Dさん',order:["えび","ホタテ","アナゴ","炙りえんがわ","たまご","ぶり","サーモン","マグロ","いくら","中トロ","大トロ","うに","はまち","タイ","カツオ","イカ","たこ","かずのこ","イワシ","しらす"]},
-      ],
-    };
-    usersByMode[mode] = pools[mode].map((s, i) => ({id: i + 1, name: s.name, order: s.order}));
-    showHome('✓ サンプルデータを読み込みました');
-  }
-
-  function resetAll() {
-    if (!confirm('全データをリセットしますか？')) return;
-    usersByMode[5] = []; usersByMode[10] = []; usersByMode[20] = [];
-    showHome();
   }
 
   // ── GROUP UI ──
@@ -2096,8 +2115,13 @@
       const myUser = { id: 'me', name: userName, order: userOrder };
       const r = compat(myUser, worldAvg);
       const worldLabel = `世界平均 (${count}人)`;
+      _worldShareData = { score: r.total, tier: worldTier(r.total), count };
       document.getElementById('worldCmpView').innerHTML =
         worldHeroCard(r, count) +
+        `<div class="share-bar world-share-bar">
+          <button class="btn-share line" onclick="shareWorldToLine()">💬 LINEで共有</button>
+          <button class="btn-share x" onclick="shareWorldToX()">𝕏 Xで共有</button>
+        </div>` +
         `<div id="worldDetailSection" class="world-detail-section">` +
         cmpScoreCard(r, userName, worldLabel) +
         cmpRankGrid(userOrder, worldAvg.order, userName, worldLabel) +
