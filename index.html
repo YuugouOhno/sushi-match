@@ -821,21 +821,38 @@
       line-height: 1.3;
       z-index: 100;
     }
-    .group-code-badge span {
+    .group-code-badge > span {
       display: block;
       font-size: 0.55rem;
       color: var(--ink3);
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-    .group-code-badge strong {
-      display: block;
+    .group-code-badge-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      justify-content: flex-end;
+    }
+    .group-code-badge-row strong {
       font-family: var(--fn);
       font-size: 0.92rem;
       font-weight: 900;
       letter-spacing: 0.2em;
       color: var(--pine);
     }
+    .group-code-copy-btn {
+      background: none;
+      border: none;
+      padding: 2px;
+      cursor: pointer;
+      color: var(--ink3);
+      display: flex;
+      align-items: center;
+      transition: color 0.15s;
+    }
+    .group-code-copy-btn:hover { color: var(--pine); }
+    .group-icon-btn-sm { width: 32px; height: 32px; font-size: 0.9rem; }
 
     .group-members {
       font-size: 0.82rem;
@@ -1000,9 +1017,13 @@
 <!-- ═══════════════════ HOME ═══════════════════ -->
 <div id="screen-home" class="screen active">
   <div class="group-code-badge" id="groupCodeBadge" style="display:none">
-    <div id="groupNameDisplay" style="display:none;font-size:0.75rem;font-weight:700;color:var(--ink2);margin-bottom:3px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
-    <span>合言葉</span>
-    <strong id="groupCodeDisplay"></strong>
+    <div class="group-code-badge-row">
+      <strong id="groupCodeDisplay"></strong>
+      <button class="group-code-copy-btn" id="groupCodeCopyBtn" onclick="copyGroupCode()" title="コピー">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </div>
+    <div id="groupNameDisplay" style="display:none;font-size:0.8rem;color:var(--ink2);margin-top:2px"></div>
   </div>
   <div class="home-outer">
     <div class="home-komon">🍣</div>
@@ -1069,11 +1090,8 @@
         <button class="btn-primary" style="flex:1" onclick="showInput()">順番を登録する</button>
         <button class="btn-secondary" style="flex:1" onclick="uiViewGroupResults(this)">結果を見る</button>
       </div>
-      <div class="group-share-icons">
-        <button class="group-icon-btn line" onclick="shareGroupLine()" title="友だちを招待">📤</button>
-        <button class="group-icon-btn" onclick="copyGroupInvite()" title="URLをコピー">🔗</button>
-      </div>
-      <div style="text-align:center;margin-top:4px">
+      <div style="text-align:center;margin-top:10px;display:flex;flex-direction:column;gap:6px">
+        <button class="group-leave-btn" onclick="shareGroupLine()">チームを共有する</button>
         <button class="group-leave-btn" onclick="uiLeaveGroup()">グループを抜ける</button>
       </div>
     </div>
@@ -1298,20 +1316,24 @@
     editingUserId = null;
     curOrder = [];
     remainingItems = [...getItems()];
-    const rec = loadMyRecord();
-    // グループモードかつlocalStorageがない場合、ローカル登録データを引き継ぐ
-    const prefill = rec || (groupCode ? _localCarryover : null);
-    if (prefill) {
-      document.getElementById('nameInput').value = prefill.name;
-      document.getElementById('myRecordToggle').checked = !!rec;
-      const savedOrder = (prefill.orders?.[mode] || []).filter(x => getItems().includes(x));
-      if (savedOrder.length === getItems().length) {
-        curOrder = savedOrder;
-        remainingItems = [];
-      }
-    } else {
-      document.getElementById('nameInput').value = '';
-      document.getElementById('myRecordToggle').checked = false;
+    document.getElementById('nameInput').value = '';
+    document.getElementById('myRecordToggle').checked = false;
+    document.getElementById('inputTitle').textContent = 'あなたの順番を教えてください';
+    renderPicker();
+    show('screen-input');
+  }
+
+  // 自分の記録を引き継いで入力画面を開く（グループ作成後の引き継ぎ用）
+  function showInputWithMyRecord(rec) {
+    editingUserId = null;
+    curOrder = [];
+    remainingItems = [...getItems()];
+    document.getElementById('nameInput').value = rec.name;
+    document.getElementById('myRecordToggle').checked = true;
+    const savedOrder = (rec.orders?.[mode] || []).filter(x => getItems().includes(x));
+    if (savedOrder.length === getItems().length) {
+      curOrder = savedOrder;
+      remainingItems = [];
     }
     document.getElementById('inputTitle').textContent = 'あなたの順番を教えてください';
     renderPicker();
@@ -1348,7 +1370,6 @@
   let _sortable = null;
   let remainingItems = [];
   let editingUserId = null;
-  let _localCarryover = null; // ローカル登録→グループ参加時の引き継ぎ用（セッション内メモリのみ）
 
   function pickItem(item) {
     const idx = remainingItems.indexOf(item);
@@ -1477,8 +1498,6 @@
         if (idx >= 0) users[idx] = { ...users[idx], name, order: [...curOrder] };
       } else {
         users.push({ id: users.length + 1, name, order: [...curOrder] });
-        // グループ参加時の引き継ぎ用にセッション内メモリへ保存（localStorageには書かない）
-        _localCarryover = { name, orders: { [mode]: [...curOrder] } };
       }
       showWorldCompare(name, [...curOrder]);
     }
@@ -1822,8 +1841,11 @@
       try {
         const res = await gasCall({ action: 'getGroupStatus', groupCode });
         if (res.groupMode) mode = res.groupMode;
+        groupName = res.groupName || null;
       } catch (e) { /* モード取得失敗時はデフォルト値を使用 */ }
       showHome(`グループ ${groupCode} に参加しました！`);
+      const myRecUrl = loadMyRecord();
+      if (myRecUrl) showInputWithMyRecord(myRecUrl);
       return;
     }
 
@@ -1901,6 +1923,8 @@
       document.getElementById('groupNameInput').value = '';
       document.getElementById('groupCreatePanel').style.display = 'none';
       showHome('グループを作りました！合言葉を友だちに教えてください。');
+      const myRec = loadMyRecord();
+      if (myRec) showInputWithMyRecord(myRec);
     } catch (e) {
       alert('グループの作成に失敗しました。GAS URLとデプロイ設定を確認してください。');
     } finally {
@@ -1934,6 +1958,8 @@
       if (res.groupMode) mode = res.groupMode;
       document.getElementById('groupJoinPanel').style.display = 'none';
       showHome(`グループ ${code} に参加しました！`);
+      const myRecJoin = loadMyRecord();
+      if (myRecJoin) showInputWithMyRecord(myRecJoin);
     } catch (e) {
       alert('グループへの参加に失敗しました。合言葉を確認してください。');
     }
@@ -1983,10 +2009,9 @@
 
   function copyGroupCode() {
     navigator.clipboard.writeText(groupCode).then(() => {
-      const btn = document.querySelector('.group-code-copy');
-      const orig = btn.textContent;
-      btn.textContent = '✓ コピー';
-      setTimeout(() => { btn.textContent = orig; }, 1500);
+      const btn = document.getElementById('groupCodeCopyBtn');
+      btn.style.color = 'var(--pine)';
+      setTimeout(() => { btn.style.color = ''; }, 1500);
     }).catch(() => {
       prompt('合言葉をコピーしてください', groupCode);
     });
